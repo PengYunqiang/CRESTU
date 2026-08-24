@@ -1,0 +1,85 @@
+clear; clc; close all;
+
+% 1. 读取主控制参数
+cfg = read_config('config_file);
+
+% 2. 组装单体 / 多体物面系统并变换至全局坐标系
+body_list = cell(cfg.n_bodies, 1);
+total_body_panels = 0;
+
+for b = 1:cfg.n_bodies
+    b_cfg = cfg.bodies(b);
+    if ~exist(b_cfg.mesh_file, 'file')
+        generate_body_bmf(b_cfg.mesh_file, 10.0, cfg.isx, cfg.isy, 8);
+    end
+    mesh_loc = read_bmf(b_cfg.mesh_file);
+    mesh_glob = transform_body_mesh(mesh_loc, b_cfg);
+    body_list{b} = mesh_glob;
+    total_body_panels = total_body_panels + mesh_glob.n_panels;
+end
+
+% 3. 提取全局水线 (Waterline)
+waterline = extract_waterline(body_list{1}, cfg.z_tol);
+
+% 4. 自动生成自由水面并导出 BMF (Type = 2)
+mesh_fs = generate_free_surface_bmf(cfg.files.fs, waterline, cfg);
+
+% 5. 处理有限水深分支 (海底 Type=4, 远场柱面 Type=5)
+has_seabed = (cfg.water_depth > 0);
+mesh_seabed = [];
+mesh_farfield = [];
+
+if has_seabed
+    mesh_seabed = gen_seabed_mesh(waterline, cfg);
+    write_bmf(cfg.files.seabed, mesh_seabed, 4);
+
+    mesh_farfield = gen_farfield_mesh(waterline, cfg, cfg.fs.nz_farfield);
+    write_bmf(cfg.files.farfield, mesh_farfield, 5);
+
+    total_dofs = total_body_panels + mesh_fs.n_panels + ...
+        mesh_seabed.n_panels + mesh_farfield.n_panels;
+else
+    total_dofs = total_body_panels + mesh_fs.n_panels;
+end
+
+% 6. 统计与封装
+stats.total_body_panels = total_body_panels;
+stats.fs_panels         = mesh_fs.n_panels;
+stats.seabed_panels     = ternary(has_seabed, mesh_seabed.n_panels, 0);
+stats.farfield_panels   = ternary(has_seabed, mesh_farfield.n_panels, 0);
+stats.total_dofs        = total_dofs;
+
+domain.cfg       = cfg;
+domain.body_list = body_list;
+domain.fs        = mesh_fs;
+domain.seabed    = mesh_seabed;
+domain.farfield  = mesh_farfield;
+domain.waterline = waterline;
+domain.stats     = stats;
+
+% 打印流体域装配报告
+fprintf('================= 全域 BMF 边界装配统计 =================\n');
+fprintf(' 算例名称        : %s\n', cfg.case_name);
+fprintf(' 浮体数量 (NBODY): %d (总物面面元: %d)\n', cfg.n_bodies, total_body_panels);
+fprintf(' 自由水面面元数  : %d (截断外径 R_out = %.1f m)\n', mesh_fs.n_panels, cfg.fs.r_outer);
+if has_seabed
+    fprintf(' 海底边界面元数  : %d (水深 h = %.1f m)\n', mesh_seabed.n_panels, cfg.water_depth);
+    fprintf(' 远场侧壁面元数  : %d\n', mesh_farfield.n_panels);
+end
+fprintf(' --------------------------------------------------------\n');
+fprintf(' 单象限总未知数 (Total System DOFs): %d\n', total_dofs);
+if ~isempty(body_list{1}.hydrostatics)
+    fprintf(' 排水体积 Vz: %.4f m^3, 浮心 Zb: %.4f m\n', ...
+        body_list{1}.hydrostatics.Vz, body_list{1}.hydrostatics.center_of_buoyancy(3));
+end
+fprintf('========================================================\n\n');
+
+
+
+% 2. 一键流体域三维可视化
+plot_bmf_domain(domain);
+
+% 3. 下一步：直接调用积分核与求解器 (例如: bem_freq_solver(domain))
+function out = ternary(cond, a, b)
+if cond, out = a; else, out = b; end
+end
