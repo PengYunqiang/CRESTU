@@ -1,23 +1,28 @@
 function report = check_mesh_quality(domain, criteria)
-% CHECK_MESH_QUALITY Execute the documented check_mesh_quality operation.
+% CHECK_MESH_QUALITY Check mesh quality for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
 %   report = check_mesh_quality(domain, criteria)
 %
+% Description:
+%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%
 % Inputs:
-%   domain          : [struct] Assembled Rankine boundary domain and configuration.
-%   criteria        : [documented value] Input required by the implemented function contract.
+%   domain             - [struct] Assembled body, free-surface, seabed, and far-field boundary domain in SI units.
+%   criteria           - [struct] Dimensionless and angular mesh-quality acceptance thresholds.
 %
 % Outputs:
-%   report          : [documented value] Function result; dimensions and units follow the implemented contract.
+%   report             - [struct] Mesh-quality or tuning diagnostics with documented units.
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Planar panel geometry, polygon moments, reflection transformations, and mesh-topology relations as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
+% References:
+%   - Hess and Smith (1964); CRESTU BMF mesh-format and geometry conventions.
 %
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
 
     if nargin < 2, criteria = struct(); end
     if ~isfield(criteria, 'body_max_ar'), criteria.body_max_ar = 4.0; end % Maximum body-panel aspect ratio.
@@ -64,9 +69,9 @@ function report = check_mesh_quality(domain, criteria)
 
     r_inner = domain.cfg.fs.r_inner;
 
-    fprintf('\n======================= Rankine BEM 网格质量诊断报告 =======================\n');
+    fprintf('\n======================= Rankine BEM mesh-quality diagnostic report =======================\n');
     fprintf('%-13s | %-6s | %-8s | %-8s | %-8s | %-8s | %-8s\n', ...
-            '边界部件', '面元数', '最大长宽比', '最大斜角(°)', '最小角(°)', '最大翘曲(°)', '不良率');
+            'Boundary component', 'Panel count', 'Maximum aspect ratio', 'Maximum skew angle(deg)', 'Minimum angle(deg)', 'Maximum warpage(deg)', 'Poor-panel rate');
     fprintf('----------------------------------------------------------------------------\n');
 
     total_panel_count = sum(cellfun(@(item) item.n_panels, parts));
@@ -77,30 +82,30 @@ function report = check_mesh_quality(domain, criteria)
     for p = 1:length(parts)
         m = parts{p};
         np = m.n_panels;
-        verts   = m.vertices; % [np x 4 x 3]
+        verts = m.vertices; % [np x 4 x 3]
         centers = m.centers;
-        ptype   = part_types(p);
+        ptype = part_types(p);
 
         aspect_ratios = zeros(np, 1);
-        skew_angles   = zeros(np, 1);
-        min_angles    = zeros(np, 1);
-        max_angles    = zeros(np, 1);
-        warps         = zeros(np, 1);
-        is_bad        = false(np, 1);
+        skew_angles = zeros(np, 1);
+        min_angles = zeros(np, 1);
+        max_angles = zeros(np, 1);
+        warps = zeros(np, 1);
+        is_bad = false(np, 1);
 
         for i = 1:np
             P = squeeze(verts(i, :, :)); % [4 x 3]
-            
-            v = [P(2,:)-P(1,:); P(3,:)-P(2,:); P(4,:)-P(3,:); P(1,:)-P(4,:)];
-            lens = sqrt(sum(v.^2, 2));
+
+            v = [P(2, :) - P(1, :); P(3, :) - P(2, :); P(4, :) - P(3, :); P(1, :) - P(4, :)];
+            lens = sqrt(sum(v .^ 2, 2));
 
             aspect_ratios(i) = max(lens) / max(min(lens), 1e-12);
 
             angles = zeros(4, 1);
             for k = 1:4
                 k_prev = mod(k - 2 + 4, 4) + 1;
-                e_in  = -v(k_prev, :) / max(lens(k_prev), 1e-12);
-                e_out =  v(k, :)      / max(lens(k), 1e-12);
+                e_in = -v(k_prev, :) / max(lens(k_prev), 1e-12);
+                e_out = v(k, :) / max(lens(k), 1e-12);
                 angles(k) = acosd(max(-1.0, min(1.0, dot(e_in, e_out))));
             end
             min_angles(i) = min(angles);
@@ -108,9 +113,9 @@ function report = check_mesh_quality(domain, criteria)
 
             skew_angles(i) = max(abs(angles - 90.0));
 
-            n1 = cross(v(1,:), v(2,:)); n2 = cross(v(3,:), v(4,:));
-            if norm(n1)>1e-12 && norm(n2)>1e-12
-                warps(i) = acosd(max(-1.0, min(1.0, dot(n1, n2)/(norm(n1)*norm(n2)))));
+            n1 = cross(v(1, :), v(2, :)); n2 = cross(v(3, :), v(4, :));
+            if norm(n1) > 1e-12 && norm(n2) > 1e-12
+                warps(i) = acosd(max(-1.0, min(1.0, dot(n1, n2) / (norm(n1) * norm(n2)))));
             end
 
             r_c = norm(centers(i, 1:2));
@@ -129,11 +134,11 @@ function report = check_mesh_quality(domain, criteria)
                     is_bad(i) = true;
                 end
             else
-                if aspect_ratios(i) > ar_limit             || ...
-                   skew_angles(i)   > criteria.max_skewness || ...
-                   min_angles(i)    < criteria.min_angle    || ...
-                   max_angles(i)    > criteria.max_angle    || ...
-                   warps(i)         > criteria.max_warp_deg
+                if aspect_ratios(i) > ar_limit || ...
+                   skew_angles(i) > criteria.max_skewness || ...
+                   min_angles(i) < criteria.min_angle || ...
+                   max_angles(i) > criteria.max_angle || ...
+                   warps(i) > criteria.max_warp_deg
                     is_bad(i) = true;
                 end
             end
@@ -144,10 +149,10 @@ function report = check_mesh_quality(domain, criteria)
                 names{p}, np, max(aspect_ratios), max(skew_angles), min(min_angles), max(warps), bad_rate);
 
         report.(names{p}).aspect_ratio = aspect_ratios;
-        report.(names{p}).skewness     = skew_angles;
-        report.(names{p}).warping      = warps;
-        report.(names{p}).is_bad       = is_bad;
-        report.(names{p}).bad_rate     = bad_rate;
+        report.(names{p}).skewness = skew_angles;
+        report.(names{p}).warping = warps;
+        report.(names{p}).is_bad = is_bad;
+        report.(names{p}).bad_rate = bad_rate;
 
         panel_rows = panel_cursor + (1:np);
         all_verts(panel_rows, :, :) = verts;
@@ -164,67 +169,81 @@ end
 % -------------------------------------------------------------------------
 % -------------------------------------------------------------------------
 function generate_bem_advice(report, criteria)
-% GENERATE_BEM_ADVICE Execute the documented generate_bem_advice operation.
+% GENERATE_BEM_ADVICE Report mesh-quality recommendations for Rankine boundary elements.
 %
 % Syntax:
 %   generate_bem_advice(report, criteria)
 %
+% Description:
+%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%
 % Inputs:
-%   report          : [documented value] Input required by the implemented function contract.
-%   criteria        : [documented value] Input required by the implemented function contract.
+%   report             - [struct] Mesh-quality results and component-level diagnostic metrics.
+%   criteria           - [struct] Dimensionless and angular mesh-quality acceptance thresholds.
 %
 % Outputs:
-%   None; the function performs the documented file, plot, or validation action.
+%   None.
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Planar panel geometry, polygon moments, reflection transformations, and mesh-topology relations as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
-    fprintf('>>> BEM 求解器前处理优化建议:\n');
+% References:
+%   - Hess and Smith (1964); CRESTU BMF mesh-format and geometry conventions.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
+
+    fprintf('>>> BEM preprocessing recommendations:\n');
     fnames = fieldnames(report);
     any_issue = false;
     for i = 1:length(fnames)
         r = report.(fnames{i});
         if r.bad_rate > 5.0
             any_issue = true;
-            fprintf(' * [%s] 不良面元占比 %.1f%%。', fnames{i}, r.bad_rate);
+            fprintf(' * [%s] poor-panel fraction %.1f%%.', fnames{i}, r.bad_rate);
             if max(r.aspect_ratio) > criteria.fs_sponge_max_ar
-                fprintf(' 径向拉伸过陡，建议降低 sponge_ratio 或增加海绵层径向段数。\n');
+                fprintf(' Radial stretching is excessive; reduce sponge_ratio or add radial sponge-layer segments.\n');
             elseif max(r.skewness) > criteria.max_skewness
-                fprintf(' 局部面元剪切较明显，可适当增加 Winslow/Laplace 平滑迭代步数。\n');
+                fprintf(' Local panel shear is excessive; increase the Winslow/Laplace smoothing iterations.\n');
             else
-                fprintf(' 存在较大翘曲或过小内角，请检查局部网格过渡。\n');
+                fprintf(' Large warpage or a small interior angle is present; inspect the local mesh transition.\n');
             end
         end
     end
     if ~any_issue
-        fprintf(' * [全部通过] 网格质量优秀！物面近场正交性良好，海绵层过渡自然，完全满足 Rankine BEM 精度要求。\n\n');
+        fprintf(' * [All checks passed] Mesh quality is excellent; near-body orthogonality and sponge-layer transitions satisfy the Rankine BEM criteria.\n\n');
     end
 end
 
 % -------------------------------------------------------------------------
 % -------------------------------------------------------------------------
 function plot_quality_diagnostic(verts, is_bad)
-% PLOT_QUALITY_DIAGNOSTIC Execute the documented plot_quality_diagnostic operation.
+% PLOT_QUALITY_DIAGNOSTIC Render a panel-level mesh-quality diagnostic plot.
 %
 % Syntax:
 %   plot_quality_diagnostic(verts, is_bad)
 %
+% Description:
+%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%
 % Inputs:
-%   verts           : [documented value] Input required by the implemented function contract.
-%   is_bad          : [documented value] Input required by the implemented function contract.
+%   verts              - [N x 4 x 3] Ordered panel vertices, [m].
+%   is_bad             - [N x 1 logical] Panel-level quality-failure mask, dimensionless.
 %
 % Outputs:
-%   None; the function performs the documented file, plot, or validation action.
+%   None.
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Planar panel geometry, polygon moments, reflection transformations, and mesh-topology relations as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
+% References:
+%   - Hess and Smith (1964); CRESTU BMF mesh-format and geometry conventions.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
+
     figure('Color', 'w', 'Position', [120, 120, 1000, 720], ...
         'Name', 'BEM Mesh Quality Verification');
     ax = gca; hold(ax, 'on'); grid(ax, 'on'); axis(ax, 'equal');
@@ -232,7 +251,7 @@ function plot_quality_diagnostic(verts, is_bad)
     xlabel('X (m)', 'FontWeight', 'bold');
     ylabel('Y (m)', 'FontWeight', 'bold');
     zlabel('Z (m)', 'FontWeight', 'bold');
-    title('Rankine BEM 网格质量诊断图 [绿色: 合格面元, 红色: 待优化面元]', 'FontSize', 12);
+    title('Rankine BEM Rankine BEM Mesh Quality [green: accepted, red: review]', 'FontSize', 12);
 
     X = squeeze(verts(:, :, 1))';
     Y = squeeze(verts(:, :, 2))';

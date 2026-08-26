@@ -1,23 +1,27 @@
 function mesh = read_bmf(filename)
-% READ_BMF Execute the documented read_bmf operation.
+% READ_BMF Read bmf for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
 %   mesh = read_bmf(filename)
 %
+% Description:
+%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%
 % Inputs:
-%   filename        : [char|string] Input or output file path.
+%   filename           - [character vector or string scalar] Input or output file path.
 %
 % Outputs:
-%   mesh            : [struct] Boundary mesh with geometry expressed in SI units.
+%   mesh               - [struct] Generated boundary-panel mesh with coordinates in [m] and areas in [m^2].
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Planar panel geometry, polygon moments, reflection transformations, and mesh-topology relations as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
+% References:
+%   - Hess and Smith (1964); CRESTU BMF mesh-format and geometry conventions.
 %
-%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
 
     fid = fopen(filename, 'r');
     if fid == -1
@@ -42,7 +46,7 @@ function mesh = read_bmf(filename)
     n_panels = double(c{1});
 
     raw_data = textscan(fid, '%f %f %f', 4 * n_panels);
-    clear file_cleanup;  % closes fid via onCleanup
+    clear file_cleanup; % closes fid via onCleanup
 
     if any(cellfun(@numel, raw_data) ~= 4 * n_panels)
         error('BMF vertex data are incomplete: %s', filename);
@@ -61,9 +65,9 @@ function mesh = read_bmf(filename)
 
     centers = zeros(n_panels, 3);
     normals = zeros(n_panels, 3);
-    areas   = zeros(n_panels, 1);
-    e1      = zeros(n_panels, 3);
-    e2      = zeros(n_panels, 3);
+    areas = zeros(n_panels, 1);
+    e1 = zeros(n_panels, 3);
+    e2 = zeros(n_panels, 3);
 
     for k = 1:n_panels
         P = squeeze(vertices(k, :, :));
@@ -134,17 +138,17 @@ function mesh = read_bmf(filename)
         end
     end
 
-    mesh.header       = strtrim(header_line);
-    mesh.ulen         = ulen;
-    mesh.panel_type   = repmat(panel_type_flag, [n_panels, 1]);
-    mesh.isx          = isx;
-    mesh.isy          = isy;
-    mesh.n_panels     = n_panels;
-    mesh.vertices     = vertices;
-    mesh.centers      = centers;
-    mesh.normals      = normals;
-    mesh.areas        = areas;
-    mesh.e1           = e1;
-    mesh.e2           = e2;
+    mesh.header = strtrim(header_line);
+    mesh.ulen = ulen;
+    mesh.panel_type = repmat(panel_type_flag, [n_panels, 1]);
+    mesh.isx = isx;
+    mesh.isy = isy;
+    mesh.n_panels = n_panels;
+    mesh.vertices = vertices;
+    mesh.centers = centers;
+    mesh.normals = normals;
+    mesh.areas = areas;
+    mesh.e1 = e1;
+    mesh.e2 = e2;
     mesh.hydrostatics = hydro;
 end

@@ -1,31 +1,32 @@
 function write_bmf(filename, mesh)
-% WRITE_BMF Execute the documented write_bmf operation.
+% WRITE_BMF Write bmf for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
 %   write_bmf(filename, mesh)
 %
+% Description:
+%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%
 % Inputs:
-%   filename        : [char|string] Input or output file path.
-%   mesh            : [struct] Boundary mesh with geometry expressed in SI units.
+%   filename           - [character vector or string scalar] Input or output file path.
+%   mesh               - [struct] Boundary-panel mesh with Cartesian geometry in SI units.
 %
 % Outputs:
-%   None; the function performs the documented file, plot, or validation action.
+%   None.
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Planar panel geometry, polygon moments, reflection transformations, and mesh-topology relations as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
+% References:
+%   - Hess and Smith (1964); CRESTU BMF mesh-format and geometry conventions.
 %
-%   Line 1: Header
-%   Line 2: Length Scale,Panel Type
-%   Line 3: ISX, ISY
-%   Line 4: NPAN
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
 
     fid = fopen(filename, 'w');
     if fid == -1
-        error('无法创建 BMF 文件: %s', filename);
+        error('Unable to create the BMF file: %s', filename);
     end
 
     unique_types = unique(mesh.panel_type);
@@ -48,5 +49,5 @@ function write_bmf(filename, mesh)
     end
     fclose(fid);
 
-    fprintf('>>> BMF 网格已成功导出: %s (NPAN=%d, Type=%d)\n', filename, mesh.n_panels, main_type);
+    fprintf('>>> BMF mesh exported successfully: %s (NPAN=%d, Type=%d)\n', filename, mesh.n_panels, main_type);
 end

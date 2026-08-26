@@ -1,31 +1,36 @@
 function fig = plot_bmf_domain(domain, mode)
-% PLOT_BMF_DOMAIN Execute the documented plot_bmf_domain operation.
+% PLOT_BMF_DOMAIN Plot bmf domain for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
 %   fig = plot_bmf_domain(domain, mode)
 %
+% Description:
+%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%
 % Inputs:
-%   domain          : [struct] Assembled Rankine boundary domain and configuration.
-%   mode            : [documented value] Input required by the implemented function contract.
+%   domain             - [struct] Assembled body, free-surface, seabed, and far-field boundary domain in SI units.
+%   mode               - [character vector or string scalar] Domain-plot rendering mode.
 %
 % Outputs:
-%   fig             : [documented value] Function result; dimensions and units follow the implemented contract.
+%   fig                - [graphics handle] MATLAB figure containing the requested visualization.
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Planar panel geometry, polygon moments, reflection transformations, and mesh-topology relations as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
+% References:
+%   - Hess and Smith (1964); CRESTU BMF mesh-format and geometry conventions.
 %
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
 
     if nargin < 2 || isempty(mode)
         mode = 'full';
     end
 
-    cfg       = domain.cfg;
+    cfg = domain.cfg;
     body_list = domain.body_list;
-    mesh_fs   = domain.fs;
+    mesh_fs = domain.fs;
     waterline = domain.waterline;
     has_seabed = (cfg.water_depth > 0);
 
@@ -46,7 +51,7 @@ function fig = plot_bmf_domain(domain, mode)
     for b = 1:cfg.n_bodies
         mb = body_list{b};
         [Xb, Yb, Zb] = extract_patch_coords(mb);
-        
+
         if is_wireframe
             patch(ax, Xb, Yb, Zb, 'w', 'FaceColor', 'none', ...
                   'EdgeColor', [0.1 0.25 0.7], 'LineWidth', 0.6);
@@ -72,7 +77,7 @@ function fig = plot_bmf_domain(domain, mode)
         C_fs = reshape(mesh_fs.mu_damping, [1, mesh_fs.n_panels]);
         patch(ax, Xf, Yf, Zf, C_fs, 'CDataMapping', 'scaled', ...
               'EdgeColor', [0.35 0.45 0.45], 'LineWidth', 0.3, 'FaceAlpha', 0.65);
-        
+
         cbar = colorbar(ax, 'Location', 'eastoutside');
         cbar.Label.String = 'Rayleigh Damping \mu(r) (Sponge Layer)';
         cbar.Label.FontSize = 10;
@@ -98,25 +103,25 @@ function fig = plot_bmf_domain(domain, mode)
         end
     end
 
-    if ~iscell(waterline), waterline={waterline}; end
-    for b=1:numel(waterline)
-        wl=waterline{b};
-        if isempty(wl)||~isfield(wl,'nodes')||isempty(wl.nodes), continue; end
+    if ~iscell(waterline), waterline = {waterline}; end
+    for b = 1:numel(waterline)
+        wl = waterline{b};
+        if isempty(wl) || ~isfield(wl, 'nodes') || isempty(wl.nodes), continue; end
         if wl.is_closed
-            wl_pts=zeros(size(wl.nodes,1)+1,2);
-            wl_pts(1:end-1,:)=wl.nodes;
-            wl_pts(end,:)=wl.nodes(1,:);
+            wl_pts = zeros(size(wl.nodes, 1) + 1, 2);
+            wl_pts(1:end - 1, :) = wl.nodes;
+            wl_pts(end, :) = wl.nodes(1, :);
         else
-            wl_pts=wl.nodes;
+            wl_pts = wl.nodes;
         end
-        plot3(ax,wl_pts(:,1),wl_pts(:,2),zeros(size(wl_pts,1),1), ...
-            'r-o','LineWidth',2.2,'MarkerSize',3.5,'MarkerFaceColor','r');
+        plot3(ax, wl_pts(:, 1), wl_pts(:, 2), zeros(size(wl_pts, 1), 1), ...
+            'r-o', 'LineWidth', 2.2, 'MarkerSize', 3.5, 'MarkerFaceColor', 'r');
     end
 
-    xlim(ax, [-cfg.fs.r_outer*1.05, cfg.fs.r_outer*1.05]);
-    ylim(ax, [-cfg.fs.r_outer*1.05, cfg.fs.r_outer*1.05]);
+    xlim(ax, [-cfg.fs.r_outer * 1.05, cfg.fs.r_outer * 1.05]);
+    ylim(ax, [-cfg.fs.r_outer * 1.05, cfg.fs.r_outer * 1.05]);
     if has_seabed
-        zlim(ax, [-cfg.water_depth*1.1, 2.0]);
+        zlim(ax, [-cfg.water_depth * 1.1, 2.0]);
     else
         zlim(ax, [-10.0, 2.0]);
     end
@@ -125,30 +130,37 @@ end
 % -------------------------------------------------------------------------
 % -------------------------------------------------------------------------
 function [X, Y, Z] = extract_patch_coords(m)
-% EXTRACT_PATCH_COORDS Execute the documented extract_patch_coords operation.
+% EXTRACT_PATCH_COORDS Convert panel vertices to coordinate arrays for patch rendering.
 %
 % Syntax:
 %   [X, Y, Z] = extract_patch_coords(m)
 %
+% Description:
+%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%
 % Inputs:
-%   m               : [documented value] Input required by the implemented function contract.
+%   m                  - [struct] Boundary mesh containing panel vertices, centers, normals, and areas in SI units.
 %
 % Outputs:
-%   X               : [documented value] Function result; dimensions and units follow the implemented contract.
-%   Y               : [documented value] Function result; dimensions and units follow the implemented contract.
-%   Z               : [documented value] Function result; dimensions and units follow the implemented contract.
+%   X                  - [4 x N] Panel x coordinates for patch rendering, [m].
+%   Y                  - [4 x N] Panel y coordinates for patch rendering, [m].
+%   Z                  - [4 x N] Panel z coordinates for patch rendering, [m].
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Planar panel geometry, polygon moments, reflection transformations, and mesh-topology relations as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
+% References:
+%   - Hess and Smith (1964); CRESTU BMF mesh-format and geometry conventions.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
+
     np = m.n_panels;
     X = squeeze(m.vertices(:, :, 1))';
     Y = squeeze(m.vertices(:, :, 2))';
     Z = squeeze(m.vertices(:, :, 3))';
-    
+
     if np == 1
         X = X(:); Y = Y(:); Z = Z(:);
     end

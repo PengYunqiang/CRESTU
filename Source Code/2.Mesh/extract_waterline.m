@@ -1,22 +1,28 @@
 function waterline = extract_waterline(mesh_body, z_tol)
-% EXTRACT_WATERLINE Execute the documented extract_waterline operation.
+% EXTRACT_WATERLINE Extract waterline for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
 %   waterline = extract_waterline(mesh_body, z_tol)
 %
+% Description:
+%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%
 % Inputs:
-%   mesh_body       : [struct] Body boundary mesh with geometry expressed in SI units.
-%   z_tol           : [documented value] Input required by the implemented function contract.
+%   mesh_body          - [struct] Wetted-body panel mesh with Cartesian geometry in SI units.
+%   z_tol              - [scalar] Waterline elevation tolerance, [m].
 %
 % Outputs:
-%   waterline       : [struct] Ordered waterline nodes in the z = 0 plane, in m.
+%   waterline          - [struct] Ordered closed waterline geometry with coordinates in [m].
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Planar panel geometry, polygon moments, reflection transformations, and mesh-topology relations as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
+% References:
+%   - Hess and Smith (1964); CRESTU BMF mesh-format and geometry conventions.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
 
     if nargin < 2, z_tol = 1e-3; end
 
@@ -38,7 +44,7 @@ function waterline = extract_waterline(mesh_body, z_tol)
     end
 
     if isempty(edges)
-        error('未能在物面网格中识别到外水线！');
+        error('No exterior waterline could be identified in the body mesh!');
     end
 
     tol_dist = 1e-3;
@@ -49,18 +55,18 @@ function waterline = extract_waterline(mesh_body, z_tol)
     % Extend both ends.  A one-direction walk truncates an open half/quarter
     % waterline whenever the arbitrary first edge lies inside the chain.
     while any(~used)
-        found=false;
-        for i=1:n_edges
+        found = false;
+        for i = 1:n_edges
             if used(i), continue; end
-            p_start=edges(i,1:2); p_end=edges(i,3:4);
-            if norm(chain(end,:)-p_start)<tol_dist
-                chain=[chain;p_end]; used(i)=true; found=true; break; %#ok<AGROW>
-            elseif norm(chain(end,:)-p_end)<tol_dist
-                chain=[chain;p_start]; used(i)=true; found=true; break; %#ok<AGROW>
-            elseif norm(chain(1,:)-p_end)<tol_dist
-                chain=[p_start;chain]; used(i)=true; found=true; break; %#ok<AGROW>
-            elseif norm(chain(1,:)-p_start)<tol_dist
-                chain=[p_end;chain]; used(i)=true; found=true; break; %#ok<AGROW>
+            p_start = edges(i, 1:2); p_end = edges(i, 3:4);
+            if norm(chain(end, :) - p_start) < tol_dist
+                chain = [chain;p_end]; used(i) = true; found = true; break; %#ok<AGROW>
+            elseif norm(chain(end, :) - p_end) < tol_dist
+                chain = [chain;p_start]; used(i) = true; found = true; break; %#ok<AGROW>
+            elseif norm(chain(1, :) - p_end) < tol_dist
+                chain = [p_start;chain]; used(i) = true; found = true; break; %#ok<AGROW>
+            elseif norm(chain(1, :) - p_start) < tol_dist
+                chain = [p_end;chain]; used(i) = true; found = true; break; %#ok<AGROW>
             end
         end
         if ~found, break; end
@@ -86,11 +92,11 @@ function waterline = extract_waterline(mesh_body, z_tol)
         unique_chain = flipud(unique_chain);
     end
 
-    waterline.nodes     = unique_chain;
-    waterline.theta     = atan2(unique_chain(:, 2), unique_chain(:, 1));
-    waterline.r         = sqrt(unique_chain(:, 1).^2 + unique_chain(:, 2).^2);
-    waterline.n_pts     = size(unique_chain, 1);
+    waterline.nodes = unique_chain;
+    waterline.theta = atan2(unique_chain(:, 2), unique_chain(:, 1));
+    waterline.r = sqrt(unique_chain(:, 1) .^ 2 + unique_chain(:, 2) .^ 2);
+    waterline.n_pts = size(unique_chain, 1);
     waterline.is_closed = is_closed;
 
-    fprintf('>>> 水线拓扑提取成功: 共 %d 个连续节点 (闭合状态: %d)\n', waterline.n_pts, is_closed);
+    fprintf('>>> Waterline topology extraction completed: with %d continuous nodes (closed: %d)\n', waterline.n_pts, is_closed);
 end

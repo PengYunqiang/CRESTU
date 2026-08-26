@@ -1,23 +1,33 @@
 function reference = read_wamit_mean_drift(filename, rho, g, wave_amplitude, wamit_length, output_length)
-% READ_WAMIT_MEAN_DRIFT Read diagonal WAMIT .8 or .9 mean-drift records.
+% READ_WAMIT_MEAN_DRIFT Read wamit mean drift for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
 %   reference = read_wamit_mean_drift(filename, rho, g, wave_amplitude, wamit_length, output_length)
 %
+% Description:
+%   The routine evaluates, reconstructs, imports, or exports quantities required by second-order mean wave-drift analysis. Complex products are time averaged consistently with the exp(i*omega*t) convention and generalized loads use the project 6-DOF ordering.
+%
 % Inputs:
-%   filename       : [char|string] WAMIT .8 momentum or .9 pressure file.
-%   rho            : [scalar] Water density, in kg/m^3.
-%   g              : [scalar] Gravitational acceleration, in m/s^2.
-%   wave_amplitude : [scalar] Incident wave amplitude, in m.
-%   wamit_length   : [scalar] ULEN used by WAMIT dimensionalization, in m.
-%   output_length  : [scalar] Length used in CRESTU coefficient reporting, in m.
+%   filename           - [character vector or string scalar] Input or output file path.
+%   rho                - [scalar] Fluid density, [kg/m^3].
+%   g                  - [scalar] Gravitational acceleration, [m/s^2].
+%   wave_amplitude     - [scalar] Reference incident-wave amplitude, [m].
+%   wamit_length       - [scalar] Characteristic length used by WAMIT normalization, [m].
+%   output_length      - [scalar] Characteristic length required for output normalization, [m].
 %
 % Outputs:
-%   reference      : [struct] Frequencies, headings, WAMIT coefficients, SI loads, and CRESTU Cd.
+%   reference          - [struct] Imported reference hydrodynamic data in documented SI normalization.
 %
-% Mathematical Reference:
-%   WAMIT dimensionalization: force/(rho*g*A^2*ULEN) and moment/(rho*g*A^2*ULEN^2).
-%   CRESTU reports Cd using 0.5*rho*g*A^2*L for forces and one additional L for moments.
+% Governing Equations / Theory:
+%   Pinkster near-field direct pressure integration, Maruo-Newman far-field momentum balance, or supporting surface reconstruction as applicable.
+%
+% References:
+%   - Pinkster, J. A. (1980), Low Frequency Second Order Wave Exciting Forces on Floating Structures; Newman, J. N. (1974), second-order slowly varying forces.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
+
     if nargin < 4 || isempty(wave_amplitude)
         wave_amplitude = 1;
     end

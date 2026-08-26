@@ -1,27 +1,33 @@
 function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, phi, dphi_dn, n_neighbors)
-% ESTIMATE_SURFACE_KINEMATICS Recover the body-surface velocity and Hessian.
+% ESTIMATE_SURFACE_KINEMATICS Recover surface velocity and potential Hessian by weighted local reconstruction.
 %
 % Syntax:
 %   [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, phi, dphi_dn, n_neighbors)
 %
+% Description:
+%   The routine evaluates, reconstructs, imports, or exports quantities required by second-order mean wave-drift analysis. Complex products are time averaged consistently with the exp(i*omega*t) convention and generalized loads use the project 6-DOF ordering.
+%
 % Inputs:
-%   mesh        : [struct] Body mesh with panel centers, normals, and tangent bases, in m.
-%   phi         : [N x Nh] Complex first-order velocity potential, in m^2/s.
-%   dphi_dn     : [N x Nh] Prescribed normal derivative of the potential, in m/s.
-%   n_neighbors : [scalar] Number of neighboring panels in each weighted least-squares stencil.
+%   mesh               - [struct] Boundary-panel mesh with Cartesian geometry in SI units.
+%   phi                - [N x K] Complex velocity-potential samples, [m^2/s].
+%   dphi_dn            - [N x K] Complex normal potential derivatives, [m/s].
+%   n_neighbors        - [scalar] Number of panels in each local reconstruction stencil, dimensionless.
 %
 % Outputs:
-%   velocity    : [N x 3 x Nh] Complex surface velocity, in m/s.
-%   hessian     : [N x 3 x 3 x Nh] Symmetric Cartesian potential Hessian, in 1/s.
-%   diagnostics : [struct] Stencil conditioning and reconstruction residuals.
+%   velocity           - [N x 3 x K] Reconstructed complex surface velocity, [m/s].
+%   hessian            - [N x 3 x 3 x K] Reconstructed Cartesian potential Hessian, [1/s].
+%   diagnostics        - [struct] Numerical conditioning, symmetry, residual, or reconstruction diagnostics.
 %
-% Mathematical Reference:
-%   A weighted quadratic moving-least-squares surface reconstruction is used for tangential
-%   derivatives. The Neumann boundary condition closes the normal component of grad(phi).
+% Governing Equations / Theory:
+%   Pinkster near-field direct pressure integration, Maruo-Newman far-field momentum balance, or supporting surface reconstruction as applicable.
+%
+% References:
+%   - Pinkster, J. A. (1980), Low Frequency Second Order Wave Exciting Forces on Floating Structures; Newman, J. N. (1974), second-order slowly varying forces.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-% ==========================================
-% Validate and normalize the input arrays
-% ==========================================
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
+
     if nargin < 4 || isempty(n_neighbors)
         n_neighbors = 20;
     end
@@ -41,10 +47,9 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
     tangent_two = reshape(mesh.e2, panel_count, 3);
     neighbor_count = min(panel_count - 1, max(6, round(n_neighbors)));
 
-% ==========================================
-% Build reusable local stencils
-% ==========================================
-    distance_squared = sum(centers.^2, 2) + sum(centers.^2, 2).' - 2 * (centers * centers.');
+%% --- 2. Build reusable local stencils ---
+
+    distance_squared = sum(centers .^ 2, 2) + sum(centers .^ 2, 2).' - 2 * (centers * centers.');
     distance_squared = max(distance_squared, 0);
     [~, distance_order] = sort(distance_squared, 2, 'ascend');
     neighbors = distance_order(:, 2:(neighbor_count + 1));
@@ -57,10 +62,10 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
         displacement = centers(neighbor_index, :) - centers(panel_index, :);
         local_u = displacement * tangent_one(panel_index, :).';
         local_v = displacement * tangent_two(panel_index, :).';
-        radius = sqrt(local_u.^2 + local_v.^2);
+        radius = sqrt(local_u .^ 2 + local_v .^ 2);
         support_radius = max(radius(end), eps);
-        weight = exp(-4 * (radius / support_radius).^2);
-        design = [local_u, local_v, 0.5 * local_u.^2, local_u .* local_v, 0.5 * local_v.^2];
+        weight = exp(-4 * (radius / support_radius) .^ 2);
+        design = [local_u, local_v, 0.5 * local_u .^ 2, local_u .* local_v, 0.5 * local_v .^ 2];
         weighted_design = design .* sqrt(weight);
         design_matrices{panel_index} = design;
         stencil_weights{panel_index} = weight;
@@ -68,9 +73,8 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
         condition_number(panel_index) = singular_values(1) / max(singular_values(end), eps);
     end
 
-% ==========================================
-% Recover gradients from a quadratic surface fit
-% ==========================================
+%% --- 3. Recover gradients from a quadratic surface fit ---
+
     velocity = complex(zeros(panel_count, 3, heading_count));
     tangent_hessian = complex(zeros(panel_count, 3, 3, heading_count));
     fit_residual = zeros(panel_count, heading_count);
@@ -87,7 +91,7 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
             normal_matrix = weighted_design' * weighted_design;
             scale = max(trace(real(normal_matrix)) / 5, 1);
             coefficient = (normal_matrix + regularization * scale * eye(5)) ...
-                \ (weighted_design' * weighted_rhs);
+                      \ (weighted_design' * weighted_rhs);
 
             velocity(panel_index, :, heading_index) = ...
                 coefficient(1) * tangent_one(panel_index, :) ...
@@ -98,22 +102,21 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
             tangent_basis = [tangent_one(panel_index, :); tangent_two(panel_index, :)];
             tangent_hessian(panel_index, :, :, heading_index) = tangent_basis' * local_hessian * tangent_basis;
             fit_residual(panel_index, heading_index) = norm(weighted_design * coefficient - weighted_rhs) ...
-                / max(norm(weighted_rhs), eps);
+                      / max(norm(weighted_rhs), eps);
         end
     end
 
-% ==========================================
-% Recover the Cartesian Hessian from gradient variation
-% ==========================================
+%% --- 4. Recover the Cartesian Hessian from gradient variation ---
+
     hessian = complex(zeros(panel_count, 3, 3, heading_count));
     hessian_residual = zeros(panel_count, heading_count);
     for heading_index = 1:heading_count
         for panel_index = 1:panel_count
             neighbor_index = neighbors(panel_index, :);
             displacement = centers(neighbor_index, :) - centers(panel_index, :);
-            radius = sqrt(sum(displacement.^2, 2));
+            radius = sqrt(sum(displacement .^ 2, 2));
             support_radius = max(radius(end), eps);
-            weight = exp(-4 * (radius / support_radius).^2);
+            weight = exp(-4 * (radius / support_radius) .^ 2);
             weighted_displacement = displacement .* sqrt(weight);
             velocity_difference = reshape(velocity(neighbor_index, :, heading_index), neighbor_count, 3) ...
                 - velocity(panel_index, :, heading_index);
@@ -121,7 +124,7 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
             normal_matrix = weighted_displacement' * weighted_displacement;
             scale = max(trace(real(normal_matrix)) / 3, 1);
             gradient_matrix = (normal_matrix + regularization * scale * eye(3)) ...
-                \ (weighted_displacement' * weighted_difference);
+                      \ (weighted_displacement' * weighted_difference);
             recovered_hessian = 0.5 * (gradient_matrix + gradient_matrix.');
 
             % Blend the direct tangent curvature with the ambient gradient-variation fit.
@@ -132,7 +135,7 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
             hessian(panel_index, :, :, heading_index) = 0.5 * (recovered_hessian + recovered_hessian.');
             hessian_residual(panel_index, heading_index) = ...
                 norm(weighted_displacement * recovered_hessian.' - weighted_difference, 'fro') ...
-                / max(norm(weighted_difference, 'fro'), eps);
+                      / max(norm(weighted_difference, 'fro'), eps);
         end
     end
 

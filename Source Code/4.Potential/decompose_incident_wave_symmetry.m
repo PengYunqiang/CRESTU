@@ -1,52 +1,57 @@
-function [phi_component,dphi_component] = decompose_incident_wave_symmetry( ...
-    centers,normals,omega,g,depth,beta_deg,amplitude,isx,isy,parity)
-% DECOMPOSE_INCIDENT_WAVE_SYMMETRY Execute the documented decompose_incident_wave_symmetry operation.
+function [phi_component, dphi_component] = decompose_incident_wave_symmetry( ...
+    centers, normals, omega, g, depth, beta_deg, amplitude, isx, isy, parity)
+% DECOMPOSE_INCIDENT_WAVE_SYMMETRY Decompose incident-wave boundary data into reflection-parity components.
 %
 % Syntax:
-%   [phi_component,dphi_component] = decompose_incident_wave_symmetry( ...
-%       centers,normals,omega,g,depth,beta_deg,amplitude,isx,isy,parity)
+%   [phi_component, dphi_component] = decompose_incident_wave_symmetry(centers, normals, omega, g, depth, beta_deg, amplitude, isx, isy, parity)
+%
+% Description:
+%   The routine implements a component of the linear Rankine boundary-element formulation for incompressible, irrotational gravity-wave flow. Geometry, reflection parity, free-surface impedance, and complex phase follow the project convention exp(i*omega*t).
 %
 % Inputs:
-%   centers         : [N x 3] Panel collocation points, in m.
-%   normals         : [N x 3] Unit panel normals pointing into the fluid.
-%   omega           : [scalar] Angular frequency, in rad/s.
-%   g               : [scalar] Gravitational acceleration, in m/s^2.
-%   depth           : [scalar] Water depth, in m; zero denotes infinite depth.
-%   beta_deg        : [scalar] Incident-wave heading, in deg.
-%   amplitude       : [scalar] Incident-wave amplitude, in m.
-%   isx             : [logical scalar] Reflection-symmetry flag for the x = 0 plane.
-%   isy             : [logical scalar] Reflection-symmetry flag for the y = 0 plane.
-%   parity          : [K x 2] Reflection parity signs for x and y symmetry planes.
+%   centers            - [N x 3] Panel collocation points in global coordinates, [m].
+%   normals            - [N x 3] Unit panel normals, dimensionless.
+%   omega              - [scalar] Angular frequency, [rad/s].
+%   g                  - [scalar] Gravitational acceleration, [m/s^2].
+%   depth              - [scalar] Water depth; a nonpositive value denotes infinite depth, [m].
+%   beta_deg           - [scalar or vector] Wave-propagation heading, [deg].
+%   amplitude          - [scalar] Incident-wave amplitude, [m].
+%   isx                - [logical scalar] Symmetry-reduction flag for the x = 0 plane.
+%   isy                - [logical scalar] Symmetry-reduction flag for the y = 0 plane.
+%   parity             - [1 x 2] Reflection parity signs for the x = 0 and y = 0 planes, dimensionless.
 %
 % Outputs:
-%   phi_component   : [documented value] Function result; dimensions and units follow the implemented contract.
-%   dphi_component  : [documented value] Function result; dimensions and units follow the implemented contract.
+%   phi_component      - [N x Nh] Incident-potential component with the requested symmetry parity, [m^2/s].
+%   dphi_component     - [N x Nh] Normal derivative of the parity-decomposed incident potential, [m/s].
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Green third identity, the Rankine kernel 1/r, linearized free-surface theory, and reflection symmetry as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
-%DECOMPOSE_INCIDENT_WAVE_SYMMETRY Project an incident wave onto one parity.
-    flags=[0,0]; headings=beta_deg; weights=1;
+% References:
+%   - Newman, J. N. (1977), Marine Hydrodynamics; Hess and Smith (1964); project boundary-condition specification.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% --- 1. Validate Inputs and Initialize the Algorithm ---
+
+    flags = [0, 0]; headings = beta_deg; weights = 1;
     if isx
-        flags=[flags;1,0]; headings=[headings,180-beta_deg]; weights=[weights,parity(1)];
+        flags = [flags;1, 0]; headings = [headings, 180 - beta_deg]; weights = [weights, parity(1)];
     end
     if isy
-        flags=[flags;0,1]; headings=[headings,-beta_deg]; weights=[weights,parity(2)];
+        flags = [flags;0, 1]; headings = [headings, -beta_deg]; weights = [weights, parity(2)];
     end
-    if isx&&isy
-        flags=[0,0;1,0;0,1;1,1];
-        headings=[beta_deg,180-beta_deg,-beta_deg,180+beta_deg];
-        weights=[1,parity(1),parity(2),parity(1)*parity(2)];
+    if isx && isy
+        flags = [0, 0;1, 0;0, 1;1, 1];
+        headings = [beta_deg, 180 - beta_deg, -beta_deg, 180 + beta_deg];
+        weights = [1, parity(1), parity(2), parity(1) * parity(2)];
     end
-    phi_component=complex(zeros(size(centers,1),1));
-    dphi_component=complex(zeros(size(centers,1),1));
-    for q=1:size(flags,1)
-        [phi,dphi]=compute_incident_wave(centers,normals,omega,g,depth,headings(q),amplitude);
-        phi_component=phi_component+weights(q)*phi;
-        dphi_component=dphi_component+weights(q)*dphi;
+    phi_component = complex(zeros(size(centers, 1), 1));
+    dphi_component = complex(zeros(size(centers, 1), 1));
+    for q = 1:size(flags, 1)
+        [phi, dphi] = compute_incident_wave(centers, normals, omega, g, depth, headings(q), amplitude);
+        phi_component = phi_component + weights(q) * phi;
+        dphi_component = dphi_component + weights(q) * dphi;
     end
-    scale=2^(isx+isy); phi_component=phi_component/scale; dphi_component=dphi_component/scale;
+    scale = 2^(isx + isy); phi_component = phi_component / scale; dphi_component = dphi_component / scale;
 end
