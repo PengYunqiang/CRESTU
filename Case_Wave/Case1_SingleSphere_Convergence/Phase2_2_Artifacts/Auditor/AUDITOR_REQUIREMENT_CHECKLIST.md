@@ -96,9 +96,9 @@
 
 | ID | Requirement / acceptance evidence | Status | Evidence / note |
 |---|---|---|---|
-| CH-01 | Forensic audit precedes any production change; every change identifies one specific physical/numerical defect with theoretical or direct numerical evidence. | PENDING | |
-| CH-02 | One physical issue is changed at a time; no bundled unrelated fixes that prevent attribution. | PENDING | |
-| CH-03 | Each change records exact code location, why old implementation is wrong, governing formula, and a focused valid unit/minimal test that would fail before and pass after. | PENDING | |
+| CH-01 | Forensic audit precedes any production change; every change identifies one specific physical/numerical defect with theoretical or direct numerical evidence. | PASS | First proposed change is supported by Green derivation and fail-before T2: all-inward cube residual `5.55e-17`, current mixed-orientation residual `0.21795`, with winding alignment controls passing. Authorization is limited to double-layer source-orientation canonicalization. |
+| CH-02 | One physical issue is changed at a time; no bundled unrelated fixes that prevent attribution. | PENDING | Proposed first patch changes only FS double-layer source orientation plus mandatory metadata/cache invalidation. FS Robin, radiation RHS, force, outer BC and damping closures must remain unchanged in this patch. Verify diff after implementation. |
+| CH-03 | Each change records exact code location, why old implementation is wrong, governing formula, and a focused valid unit/minimal test that would fail before and pass after. | PENDING | Fail-before evidence is valid and preserved. After-test must exercise production canonicalization (shared routine or production-exposed orientation metadata plus inspected assembly path), not merely duplicate the multiplication in a test helper. |
 | CH-04 | Each change reruns representative clean frequencies and only the necessary convergence studies; presents before/after evidence and receives Auditor review. | PENDING | |
 | CH-05 | Test validity is audited: correct target/call path/config, assertions sensitive to defect, no cache contamination, intended geometry actually changed, and no circular oracle. | PENDING | |
 
@@ -203,7 +203,28 @@ Production experiments and the frustum factors remain blocked until tests 1–6 
 
 Review the focused diff plus pre-change baseline, theory, minimal reproduction/test, clean representative reruns, convergence impact, and absence of forbidden shortcuts. Insufficient evidence is a `BLOCKER`.
 
-**Current verdict:** `PENDING — no Phase 2.2 production change reviewed`.
+**Current verdict:** `PENDING — first atomic fix authorized; no post-change diff/evidence reviewed`.
+
+#### CP4 pre-change authorization 1 — double-layer source orientation
+
+**Decision:** `PASS — authorization limited to this one issue`.
+
+Accepted fail-before evidence:
+
+- All 19 rows match their declared before-state, while physical `currentPass` remains visibly 10/19; expected failures are not counted as validation.
+- T2 uses the actual `rankine_panel_integrals` kernel. The all-inward closed cube satisfies `D_s 1=0` to `5.55e-17`; changing only the top/FS to current outward orientation produces residual `0.21795`. Both winding-alignment controls pass, isolating a mixed domain/source orientation defect.
+- T3/T5/T6/T10/T7 independently remain red with the expected signs/magnitudes. The complex-kappa row is honestly `NOT_IMPLEMENTED`.
+
+Authorized implementation contract:
+
+1. Canonical double-layer/source orientation is `n_D=-n_Omega` for every component. Mapping is body `+1`, FS `-1`, bottom `+1`, outer `+1` relative to the stored/winding derivative.
+2. Apply the component sign to each source-column `dGdn` contribution (after image summation is equivalent) before forming `Dij=-dGdn/(4pi)`. It must affect **all collocation rows** for that source column.
+3. Do not multiply `Sij`, prescribed Neumann RHS, stored physical normals, pressure normals, or the `+0.5` boundary self coefficient. The self coefficient is added once and is orientation-independent after canonicalization.
+4. Assert stored normal–winding alignment per component before using the fixed component map. A silent inconsistent BMF must fail rather than receive the wrong canonical sign.
+5. Store the named convention and component signs in `assembly_info` and the effective/cache manifest. The `assemble_rankine_matrix.m` file hash already invalidates potential cache through `get_rankine_code_version`; any new shared production helper must also be added to that version fingerprint.
+6. Preserve fail-before CSV/MAT/MD unchanged and create separate after evidence. T2 mixed case must turn green near machine precision; T3/T5/T6/T10/T7 must remain in their prior physical fail state, showing this patch did not smuggle other convention fixes.
+7. The after-test must touch the production canonicalization path. A hard-coded second copy of the orientation multiplication is not sufficient by itself. Diff inspection plus production-reported signs/hash are mandatory.
+8. No WAMIT comparison or outer-domain solve is evidence for this patch. No reciprocity projection, PSD clipping, scaling, smoothing or unrelated modification is authorized.
 
 ### Checkpoint 5 — Final acceptance
 
@@ -233,3 +254,4 @@ Reconcile every checklist item against actual artifacts/data, answer Q1–Q6, au
 | 2026-08-30 | Checkpoint 2 — Outer-domain design | BLOCKER | Clean/cache authenticity, directional `h/lambda`, sponge start/width independence, and radius×resolution groups pass design review. Replacing physical FS/bottom radial extents with fine-resolution-zone endpoints does not meet two explicit OFAT requirements. A valid independently controlled closed-domain parameterization plus derived connector BC, or an explicit unresolved requirement/scope decision, is required. |
 | 2026-08-30 | Checkpoint 2 resubmission — Outer-domain design | PASS | The physical extent gap is resolved by independent top/bottom frustum radii with deterministic closure effects. Derived meridional/tangential counts preserve actual wall spacing and prevent a radius-resolution confound. Frustum topology/metric assertions are explicit. Its projected finite-depth outgoing BC remains a mandatory Checkpoint 3 gate before factors 2/4 may run. |
 | 2026-08-30 | Checkpoint 3 — BC mathematics | BLOCKER | Independent Green derivation confirms `D_s=1/2-K_s` requires inward source normals and RHS `-S q_s`. Current FS orientation, radiation RHS, finite-depth FS coefficient, outer S sign/decay/sponge consistency, and body-force signs are inconsistent; radiation RHS and force errors can double-cancel. Diffraction body RHS, bottom zero flux, incident time convention and RAO matrix form are analytically consistent. Prioritized T1–T11 gates are recorded; no production change or outer experiment is yet accepted. |
+| 2026-08-30 | CP4 pre-change authorization 1 | PASS | Fail-before suite truthfully reports 10/19 physical passes and isolates mixed FS double-layer orientation with actual Rankine kernel/closed-cube controls. Authorized only per-source-column FS `dGdn` canonicalization plus alignment assertions and cache/assembly metadata. Separate production-path after evidence must turn only T2 green; full CP4 remains pending. |
