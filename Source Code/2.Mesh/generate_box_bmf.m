@@ -5,7 +5,8 @@ function mesh_box = generate_box_bmf(filename, L, B, D, isx, isy, Nx, Ny, Nz)
 %   mesh_box = generate_box_bmf(filename, L, B, D, isx, isy, Nx, Ny, Nz)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   filename           - [character vector or string scalar] Input or output file path.
@@ -29,17 +30,35 @@ function mesh_box = generate_box_bmf(filename, L, B, D, isx, isy, Nx, Ny, Nz)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if nargin < 1 || isempty(filename), filename = 'box_body.bmf'; end
-    if nargin < 2, L = 20.0; end
-    if nargin < 3, B = 10.0; end
-    if nargin < 4, D = 4.0;  end
-    if nargin < 5, isx = 0;  end
-    if nargin < 6, isy = 0;  end
-    if nargin < 7, Nx = 10;  end
-    if nargin < 8, Ny = 6;   end
-    if nargin < 9, Nz = 5;   end
+    if nargin < 1 || isempty(filename)
+        filename ='box_body.bmf';
+    end
+    if nargin < 2
+        L = 20.0;
+    end
+    if nargin < 3
+        B = 10.0;
+    end
+    if nargin < 4
+        D = 4.0;
+    end
+    if nargin < 5
+        isx = 0;
+    end
+    if nargin < 6
+        isy = 0;
+    end
+    if nargin < 7
+        Nx = 10;
+    end
+    if nargin < 8
+        Ny = 6;
+    end
+    if nargin < 9
+        Nz = 5;
+    end
 
     if isx == 1
         x_range = [0, L / 2];
@@ -63,8 +82,10 @@ function mesh_box = generate_box_bmf(filename, L, B, D, isx, isy, Nx, Ny, Nz)
 
     for i = 1:Nx
         for j = 1:Ny
-            x1 = x_lin(i);   x2 = x_lin(i + 1);
-            y1 = y_lin(j);   y2 = y_lin(j + 1);
+            x1 = x_lin(i);
+            x2 = x_lin(i + 1);
+            y1 = y_lin(j);
+            y2 = y_lin(j + 1);
 
             p1 = [x1, y1, -D];
             p2 = [x1, y2, -D];
@@ -77,8 +98,10 @@ function mesh_box = generate_box_bmf(filename, L, B, D, isx, isy, Nx, Ny, Nz)
 
     for j = 1:Ny
         for k = 1:Nz
-            y1 = y_lin(j);   y2 = y_lin(j + 1);
-            z1 = z_lin(k);   z2 = z_lin(k + 1);
+            y1 = y_lin(j);
+            y2 = y_lin(j + 1);
+            z1 = z_lin(k);
+            z2 = z_lin(k + 1);
 
             p1 = [L / 2, y1, z1];
             p2 = [L / 2, y2, z1];
@@ -92,8 +115,10 @@ function mesh_box = generate_box_bmf(filename, L, B, D, isx, isy, Nx, Ny, Nz)
     if isx == 0
         for j = 1:Ny
             for k = 1:Nz
-                y1 = y_lin(j);   y2 = y_lin(j + 1);
-                z1 = z_lin(k);   z2 = z_lin(k + 1);
+                y1 = y_lin(j);
+                y2 = y_lin(j + 1);
+                z1 = z_lin(k);
+                z2 = z_lin(k + 1);
 
                 p1 = [-L / 2, y2, z1];
                 p2 = [-L / 2, y1, z1];
@@ -107,8 +132,10 @@ function mesh_box = generate_box_bmf(filename, L, B, D, isx, isy, Nx, Ny, Nz)
 
     for i = 1:Nx
         for k = 1:Nz
-            x1 = x_lin(i);   x2 = x_lin(i + 1);
-            z1 = z_lin(k);   z2 = z_lin(k + 1);
+            x1 = x_lin(i);
+            x2 = x_lin(i + 1);
+            z1 = z_lin(k);
+            z2 = z_lin(k + 1);
 
             p1 = [x2, B / 2, z1];
             p2 = [x1, B / 2, z1];
@@ -122,8 +149,10 @@ function mesh_box = generate_box_bmf(filename, L, B, D, isx, isy, Nx, Ny, Nz)
     if isy == 0
         for i = 1:Nx
             for k = 1:Nz
-                x1 = x_lin(i);   x2 = x_lin(i + 1);
-                z1 = z_lin(k);   z2 = z_lin(k + 1);
+                x1 = x_lin(i);
+                x2 = x_lin(i + 1);
+                z1 = z_lin(k);
+                z2 = z_lin(k + 1);
 
                 p1 = [x1, -B / 2, z1];
                 p2 = [x2, -B / 2, z1];

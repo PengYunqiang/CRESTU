@@ -5,7 +5,8 @@ function [force, pressure] = compute_wave_excitation(phi_incident, phi_diffracti
 %   [force, pressure] = compute_wave_excitation(phi_incident, phi_diffraction, nj, areas, omega, rho)
 %
 % Description:
-%   The routine converts first-order potential-flow or rigid-body data into generalized hydrodynamic coefficients, loads, restoring terms, or motions. Translational and rotational quantities retain the global 6-DOF ordering used by CRESTU.
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
 %   phi_incident       - [N x Nh] Complex incident-wave potentials, [m^2/s].
@@ -27,16 +28,20 @@ function [force, pressure] = compute_wave_excitation(phi_incident, phi_diffracti
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    validateattributes(omega, {'numeric'}, {'scalar', 'real', 'positive', 'finite'});
-    validateattributes(rho, {'numeric'}, {'scalar', 'real', 'positive', 'finite'});
+    validateattributes(omega, {'numeric'}, {'scalar','real','positive','finite'});
+    validateattributes(rho, {'numeric'}, {'scalar','real','positive','finite'});
     areas = reshape(areas, [], 1);
-    if isempty(phi_incident), phi_incident = zeros(size(phi_diffraction), 'like', phi_diffraction); end
-    if isempty(phi_diffraction), phi_diffraction = zeros(size(phi_incident), 'like', phi_incident); end
+    if isempty(phi_incident)
+        phi_incident = zeros(size(phi_diffraction),'like', phi_diffraction);
+    end
+    if isempty(phi_diffraction)
+        phi_diffraction = zeros(size(phi_incident),'like', phi_incident);
+    end
     if ~isequal(size(phi_incident), size(phi_diffraction)) || ...
             size(phi_incident, 1) ~= size(nj, 1) || numel(areas) ~= size(nj, 1)
-        error('CRESTU:ExcitationShape', 'Incident/diffraction potentials, normals, and areas are inconsistent.');
+        error('CRESTU:ExcitationShape','Incident/diffraction potentials, normals, and areas are inconsistent.');
     end
     pressure = -1i * omega * rho * (phi_incident + phi_diffraction);
     force = nj.' * (pressure .* areas);

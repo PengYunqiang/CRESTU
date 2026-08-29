@@ -5,7 +5,8 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
 %   [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, phi, dphi_dn, n_neighbors)
 %
 % Description:
-%   The routine evaluates, reconstructs, imports, or exports quantities required by second-order mean wave-drift analysis. Complex products are time averaged consistently with the exp(i*omega*t) convention and generalized loads use the project 6-DOF ordering.
+%   Computes or processes second-order mean wave-drift quantities.
+%   Complex averages follow exp(i*omega*t) and the 6-DOF order.
 %
 % Inputs:
 %   mesh               - [struct] Boundary-panel mesh with Cartesian geometry in SI units.
@@ -26,7 +27,7 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     if nargin < 4 || isempty(n_neighbors)
         n_neighbors = 20;
@@ -35,10 +36,10 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
     heading_count = size(phi, 2);
     dphi_dn = reshape(dphi_dn, panel_count, heading_count);
     if size(phi, 1) ~= panel_count
-        error('CRESTU:KinematicsShape', 'phi rows must equal the number of body panels.');
+        error('CRESTU:KinematicsShape','phi rows must equal the number of body panels.');
     end
     if panel_count < 6
-        error('CRESTU:KinematicsStencil', 'At least six panels are required for surface reconstruction.');
+        error('CRESTU:KinematicsStencil','At least six panels are required for surface reconstruction.');
     end
 
     centers = reshape(mesh.centers, panel_count, 3);
@@ -47,11 +48,11 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
     tangent_two = reshape(mesh.e2, panel_count, 3);
     neighbor_count = min(panel_count - 1, max(6, round(n_neighbors)));
 
-%% --- 2. Build reusable local stencils ---
+%% Stage 2: Build reusable local stencils
 
     distance_squared = sum(centers .^ 2, 2) + sum(centers .^ 2, 2).' - 2 * (centers * centers.');
     distance_squared = max(distance_squared, 0);
-    [~, distance_order] = sort(distance_squared, 2, 'ascend');
+    [~, distance_order] = sort(distance_squared, 2,'ascend');
     neighbors = distance_order(:, 2:(neighbor_count + 1));
     design_matrices = cell(panel_count, 1);
     stencil_weights = cell(panel_count, 1);
@@ -69,11 +70,11 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
         weighted_design = design .* sqrt(weight);
         design_matrices{panel_index} = design;
         stencil_weights{panel_index} = weight;
-        singular_values = svd(weighted_design, 'econ');
+        singular_values = svd(weighted_design,'econ');
         condition_number(panel_index) = singular_values(1) / max(singular_values(end), eps);
     end
 
-%% --- 3. Recover gradients from a quadratic surface fit ---
+%% Stage 3: Recover gradients from a quadratic surface fit
 
     velocity = complex(zeros(panel_count, 3, heading_count));
     tangent_hessian = complex(zeros(panel_count, 3, 3, heading_count));
@@ -91,7 +92,7 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
             normal_matrix = weighted_design' * weighted_design;
             scale = max(trace(real(normal_matrix)) / 5, 1);
             coefficient = (normal_matrix + regularization * scale * eye(5)) ...
-                      \ (weighted_design' * weighted_rhs);
+ \ (weighted_design' * weighted_rhs);
 
             velocity(panel_index, :, heading_index) = ...
                 coefficient(1) * tangent_one(panel_index, :) ...
@@ -102,11 +103,11 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
             tangent_basis = [tangent_one(panel_index, :); tangent_two(panel_index, :)];
             tangent_hessian(panel_index, :, :, heading_index) = tangent_basis' * local_hessian * tangent_basis;
             fit_residual(panel_index, heading_index) = norm(weighted_design * coefficient - weighted_rhs) ...
-                      / max(norm(weighted_rhs), eps);
+ / max(norm(weighted_rhs), eps);
         end
     end
 
-%% --- 4. Recover the Cartesian Hessian from gradient variation ---
+%% Stage 4: Recover the Cartesian Hessian from gradient variation
 
     hessian = complex(zeros(panel_count, 3, 3, heading_count));
     hessian_residual = zeros(panel_count, heading_count);
@@ -124,26 +125,26 @@ function [velocity, hessian, diagnostics] = estimate_surface_kinematics(mesh, ph
             normal_matrix = weighted_displacement' * weighted_displacement;
             scale = max(trace(real(normal_matrix)) / 3, 1);
             gradient_matrix = (normal_matrix + regularization * scale * eye(3)) ...
-                      \ (weighted_displacement' * weighted_difference);
+ \ (weighted_displacement' * weighted_difference);
             recovered_hessian = 0.5 * (gradient_matrix + gradient_matrix.');
 
-            % Blend the direct tangent curvature with the ambient gradient-variation fit.
+% Blend the direct tangent curvature with the ambient gradient-variation fit.
             direct_tangent = reshape(tangent_hessian(panel_index, :, :, heading_index), 3, 3);
             tangent_projector = eye(3) - normals(panel_index, :).' * normals(panel_index, :);
             recovered_hessian = recovered_hessian ...
                 + tangent_projector * (direct_tangent - recovered_hessian) * tangent_projector;
             hessian(panel_index, :, :, heading_index) = 0.5 * (recovered_hessian + recovered_hessian.');
             hessian_residual(panel_index, heading_index) = ...
-                norm(weighted_displacement * recovered_hessian.' - weighted_difference, 'fro') ...
-                      / max(norm(weighted_difference, 'fro'), eps);
+                norm(weighted_displacement * recovered_hessian.' - weighted_difference,'fro') ...
+ / max(norm(weighted_difference,'fro'), eps);
         end
     end
 
     diagnostics = struct( ...
-        'neighbor_count', neighbor_count, ...
-        'condition_number', condition_number, ...
-        'median_condition_number', median(condition_number), ...
-        'max_condition_number', max(condition_number), ...
-        'potential_fit_residual', fit_residual, ...
-        'hessian_fit_residual', hessian_residual);
+'neighbor_count', neighbor_count, ...
+'condition_number', condition_number, ...
+'median_condition_number', median(condition_number), ...
+'max_condition_number', max(condition_number), ...
+'potential_fit_residual', fit_residual, ...
+'hessian_fit_residual', hessian_residual);
 end

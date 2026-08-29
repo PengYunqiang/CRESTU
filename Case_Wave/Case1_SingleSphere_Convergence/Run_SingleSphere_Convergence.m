@@ -12,13 +12,17 @@ function summary = Run_SingleSphere_Convergence(force_recompute)
 %
 % Mathematical Reference:
 %   Grid-convergence assessment against WAMIT FullSphereIRR0 and FullSphereIRR3.
+%% Stage 1: Initialize inputs and dependencies
+
     if nargin < 1
         force_recompute = false;
     end
+
+%% Stage 2: Run the core calculation
     [case_directory, ~, wamit_root] = initialize_paths();
-    level_names = {'Coarse', 'Medium', 'Fine'};
-    subdirectories = {'Mesh_Coarse', 'Mesh_Medium', 'Mesh_Fine'};
-    config_names = {'Case1_Coarse.cfg', 'Case1_Medium.cfg', 'Case1_Fine.cfg'};
+    level_names = {'Coarse','Medium','Fine'};
+    subdirectories = {'Mesh_Coarse','Mesh_Medium','Mesh_Fine'};
+    config_names = {'Case1_Coarse.cfg','Case1_Medium.cfg','Case1_Fine.cfg'};
     result_set = cell(3, 1);
     runtime_seconds = zeros(3, 1);
 
@@ -27,7 +31,7 @@ function summary = Run_SingleSphere_Convergence(force_recompute)
         cfg = read_config(config_file);
         timer_id = tic;
         if ~force_recompute && is_compatible_result(cfg.files.results, cfg)
-            loaded = load(cfg.files.results, 'results');
+            loaded = load(cfg.files.results,'results');
             result_set{level_index} = loaded.results;
         else
             result_set{level_index} = run_frequency_domain_case(config_file);
@@ -35,18 +39,18 @@ function summary = Run_SingleSphere_Convergence(force_recompute)
         runtime_seconds(level_index) = toc(timer_id);
     end
 
-    reference_irr0 = read_wamit_dataset(fullfile(wamit_root, 'FullSphereIRR0'), 10);
-    reference_irr3 = read_wamit_dataset(fullfile(wamit_root, 'FullSphereIRR3'), 10);
+    reference_irr0 = read_wamit_dataset(fullfile(wamit_root,'FullSphereIRR0'), 10);
+    reference_irr3 = read_wamit_dataset(fullfile(wamit_root,'FullSphereIRR3'), 10);
     panel_counts = cellfun(@(item) item.stats.total_dofs, result_set);
-    summary = struct('schema_version', 1, 'levels', {level_names}, 'results', {result_set}, ...
-        'runtime_seconds', runtime_seconds, 'panel_counts', panel_counts, ...
-        'reference_irr0', reference_irr0, 'reference_irr3', reference_irr3, ...
-        'frequency_grid', 0.5:0.1:2.0, 'headings', [0, 45, 90]);
-    summary_file = fullfile(case_directory, 'SingleSphere_Convergence_Summary.mat');
-    save(summary_file, 'summary', '-v7.3');
+    summary = struct('schema_version', 1,'levels', {level_names},'results', {result_set}, ...
+'runtime_seconds', runtime_seconds,'panel_counts', panel_counts, ...
+'reference_irr0', reference_irr0,'reference_irr3', reference_irr3, ...
+'frequency_grid', 0.5:0.1:2.0,'headings', [0, 45, 90]);
+    summary_file = fullfile(case_directory,'SingleSphere_Convergence_Summary.mat');
+    save(summary_file,'summary','-v7.3');
     Plot_SingleBody_Results(summary_file);
     Plot_MeanDrift_Comparison(summary_file);
-    fprintf('>>> Single-sphere convergence suite complete: %s\n', summary_file);
+    fprintf('[OK] Single-sphere convergence suite completed: %s\n', summary_file);
 end
 
 function [case_directory, code_root, wamit_root] = initialize_paths()
@@ -65,14 +69,19 @@ function [case_directory, code_root, wamit_root] = initialize_paths()
 %
 % Mathematical Reference:
 %   Path utility; no mathematical model is used.
+%% Stage 1: Initialize inputs and dependencies
+
     case_directory = fileparts(mfilename('fullpath'));
+
+%% Stage 2: Run the core calculation
+
     case_wave_directory = fileparts(case_directory);
     code_root = fileparts(case_wave_directory);
-    wamit_root = fullfile(fileparts(code_root), 'WAMIT');
-    addpath(fullfile(code_root, '1.Input'), fullfile(code_root, '2.Mesh'), ...
-        fullfile(code_root, '3.HessSmith'), fullfile(code_root, '4.Potential'), ...
-        fullfile(code_root, '5.Force'), fullfile(code_root, '6.MeanDriftLoads'), ...
-        case_wave_directory, fullfile(case_wave_directory, 'Common_Scripts'));
+    wamit_root = fullfile(fileparts(code_root),'WAMIT');
+    addpath(fullfile(code_root,'1.Input'), fullfile(code_root,'2.Mesh'), ...
+        fullfile(code_root,'3.HessSmith'), fullfile(code_root,'4.Potential'), ...
+        fullfile(code_root,'5.Force'), fullfile(code_root,'6.MeanDriftLoads'), ...
+        case_wave_directory, fullfile(case_wave_directory,'Common_Scripts'));
 end
 
 function compatible = is_compatible_result(filename, cfg)
@@ -90,17 +99,22 @@ function compatible = is_compatible_result(filename, cfg)
 %
 % Mathematical Reference:
 %   Exact metadata validation with floating-point tolerance.
+%% Stage 1: Initialize inputs and dependencies
+
     compatible = false;
     if ~isfile(filename)
         return
     end
-    loaded = load(filename, 'results');
-    if ~isfield(loaded, 'results') || ~isfield(loaded.results, 'schema_version')
+
+%% Stage 2: Run the core calculation
+
+    loaded = load(filename,'results');
+    if ~isfield(loaded,'results') || ~isfield(loaded.results,'schema_version')
         return
     end
     compatible = loaded.results.schema_version >= 5 ...
-        && isequal(size(loaded.results.omegas), size(cfg.freq.omegas)) ...
-        && max(abs(loaded.results.omegas - cfg.freq.omegas)) < 1.0e-12 ...
-        && isequal(loaded.results.headings, cfg.wave.headings) ...
-        && isfield(loaded.results, 'drift') && loaded.results.drift.enabled;
+ && isequal(size(loaded.results.omegas), size(cfg.freq.omegas)) ...
+ && max(abs(loaded.results.omegas - cfg.freq.omegas)) < 1.0e-12 ...
+ && isequal(loaded.results.headings, cfg.wave.headings) ...
+ && isfield(loaded.results,'drift') && loaded.results.drift.enabled;
 end

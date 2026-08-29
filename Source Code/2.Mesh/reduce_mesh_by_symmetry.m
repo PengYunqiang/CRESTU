@@ -5,7 +5,8 @@ function reduced = reduce_mesh_by_symmetry(mesh, isx, isy, tolerance)
 %   reduced = reduce_mesh_by_symmetry(mesh, isx, isy, tolerance)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   mesh               - [struct] Boundary-panel mesh with Cartesian geometry in SI units.
@@ -24,22 +25,31 @@ function reduced = reduce_mesh_by_symmetry(mesh, isx, isy, tolerance)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if nargin < 4 || isempty(tolerance), tolerance = 1e-9; end
-    if ~isx && ~isy, reduced = mesh; return; end
+    if nargin < 4 || isempty(tolerance)
+        tolerance = 1e-9;
+    end
+    if ~isx && ~isy
+        reduced = mesh;
+        return;
+    end
     centers = reshape(mesh.centers, mesh.n_panels, 3);
     vertices = reshape(mesh.vertices, mesh.n_panels, 4, 3);
     keep = true(mesh.n_panels, 1);
-    if isx, keep = keep&centers(:, 1) >= -tolerance; end
-    if isy, keep = keep&centers(:, 2) >= -tolerance; end
+    if isx
+        keep = keep&centers(:, 1) >= -tolerance;
+    end
+    if isy
+        keep = keep&centers(:, 2) >= -tolerance;
+    end
     candidate = find(keep);
     if isx
         vx = reshape(vertices(candidate, :, 1), numel(candidate), 4);
         crossing = min(vx, [], 2) < -tolerance&max(vx, [], 2) > tolerance;
         if any(crossing)
             error('CRESTU:SymmetryPanelCrossing', ...
-                '%d panels cross x=0; remesh with an x-symmetry edge.', nnz(crossing));
+'%d panels cross x=0; remesh with an x-symmetry edge.', nnz(crossing));
         end
     end
     if isy
@@ -47,17 +57,20 @@ function reduced = reduce_mesh_by_symmetry(mesh, isx, isy, tolerance)
         crossing = min(vy, [], 2) < -tolerance&max(vy, [], 2) > tolerance;
         if any(crossing)
             error('CRESTU:SymmetryPanelCrossing', ...
-                '%d panels cross y=0; remesh with a y-symmetry edge.', nnz(crossing));
+'%d panels cross y=0; remesh with a y-symmetry edge.', nnz(crossing));
         end
     end
-    fields = {'vertices', 'centers', 'normals', 'areas', 'e1', 'e2', 'panel_type', 'mu_damping'};
+    fields = {'vertices','centers','normals','areas','e1','e2','panel_type','mu_damping'};
     reduced = mesh;
     for k = 1:numel(fields)
         name = fields{k};
         if isfield(mesh, name) && ~isempty(mesh.(name))
-            value = mesh.(name); reduced.(name) = value(keep, :, :);
+            value = mesh.(name);
+            reduced.(name) = value(keep, :, :);
         end
     end
-    reduced.n_panels = nnz(keep); reduced.isx = isx; reduced.isy = isy;
+    reduced.n_panels = nnz(keep);
+    reduced.isx = isx;
+    reduced.isy = isy;
     reduced.header = sprintf('%s | reduced ISX=%d ISY=%d', mesh.header, isx, isy);
 end

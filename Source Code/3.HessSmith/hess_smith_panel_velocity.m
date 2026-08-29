@@ -5,7 +5,8 @@ function [u, v, w] = hess_smith_panel_velocity(P, X, p_center, e1, e2, e3) %#ok<
 %   [u, v, w] = hess_smith_panel_velocity(P, X, p_center, e1, e2, e3)
 %
 % Description:
-%   The implementation uses the constant-strength Hess-Smith source-panel formulation in a panel-local orthonormal frame. Analytic edge logarithms and an oriented solid angle provide the tangential and normal influence components without changing the panel-source convention.
+%   Uses constant-strength Hess-Smith panels in a local frame.
+%   Analytic edge terms give tangential and normal influence.
 %
 % Inputs:
 %   P                  - [4 x 3] Ordered panel vertices in global Cartesian coordinates, [m].
@@ -28,7 +29,7 @@ function [u, v, w] = hess_smith_panel_velocity(P, X, p_center, e1, e2, e3) %#ok<
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     e3 = e3 / norm(e3);
     e1 = e1 - dot(e1, e3) * e3;
@@ -48,8 +49,8 @@ function [u, v, w] = hess_smith_panel_velocity(P, X, p_center, e1, e2, e3) %#ok<
     y = X_loc(2);
     z = X_loc(3);
 
-    % A constant flat panel is represented by the projection of the four
-    % vertices onto the local panel plane.
+% A constant flat panel is represented by the projection of the four
+% vertices onto the local panel plane.
     xi = [P_loc(:, 1); P_loc(1, 1)];
     eta = [P_loc(:, 2); P_loc(1, 2)];
 
@@ -57,7 +58,7 @@ function [u, v, w] = hess_smith_panel_velocity(P, X, p_center, e1, e2, e3) %#ok<
     v_loc = 0.0;
     eps_tol = 1e-14;
 
-    % In-plane components: standard Hess-Smith edge-logarithm formula.
+% In-plane components: standard Hess-Smith edge-logarithm formula.
     for k = 1:4
         x1 = xi(k);
         y1 = eta(k);
@@ -83,9 +84,9 @@ function [u, v, w] = hess_smith_panel_velocity(P, X, p_center, e1, e2, e3) %#ok<
         end
     end
 
-    % Normal component: signed solid angle of two consistently oriented
-    % triangles. This form has the correct far-field decay and avoids
-    % inverse-tangent branch/complement errors.
+% Normal component: signed solid angle of two consistently oriented
+% triangles. This form has the correct far-field decay and avoids
+% inverse-tangent branch/complement errors.
     q1 = [P_loc(1, 1) - x, P_loc(1, 2) - y, -z];
     q2 = [P_loc(2, 1) - x, P_loc(2, 2) - y, -z];
     q3 = [P_loc(3, 1) - x, P_loc(3, 2) - y, -z];
@@ -108,7 +109,8 @@ function omega = triangle_solid_angle(a, b, c)
 %   omega = triangle_solid_angle(a, b, c)
 %
 % Description:
-%   The implementation uses the constant-strength Hess-Smith source-panel formulation in a panel-local orthonormal frame. Analytic edge logarithms and an oriented solid angle provide the tangential and normal influence components without changing the panel-source convention.
+%   Uses constant-strength Hess-Smith panels in a local frame.
+%   Analytic edge terms give tangential and normal influence.
 %
 % Inputs:
 %   a                  - [1 x 3] First triangle vertex relative to the field point, [m].
@@ -126,7 +128,7 @@ function omega = triangle_solid_angle(a, b, c)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     la = norm(a);
     lb = norm(b);

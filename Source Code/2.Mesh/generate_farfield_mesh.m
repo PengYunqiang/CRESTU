@@ -5,7 +5,8 @@ function mesh_farfield = generate_farfield_mesh(waterline, cfg, nz_layers)
 %   mesh_farfield = generate_farfield_mesh(waterline, cfg, nz_layers)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   waterline          - [struct] Ordered waterline nodes and segment metadata, with coordinates in [m].
@@ -23,20 +24,24 @@ function mesh_farfield = generate_farfield_mesh(waterline, cfg, nz_layers)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if nargin < 3 || isempty(nz_layers), nz_layers = 8; end
+    if nargin < 3 || isempty(nz_layers)
+        nz_layers = 8;
+    end
 
-    h = cfg.water_depth;
-    if h <= 0, h = cfg.fs.r_outer * 0.8; end
+    waterDepth = cfg.water_depth;
+    if waterDepth <= 0
+        waterDepth = cfg.fs.r_outer * 0.8;
+    end
 
     r_outer = cfg.fs.r_outer;
     wl_nodes = waterline.nodes;
     n_pts = size(wl_nodes, 1);
     is_closed = waterline.is_closed;
 
-    % =====================================================================
-    % =====================================================================
+% =====================================================================
+% =====================================================================
     seg_lens = zeros(n_pts, 1);
     for j = 1:n_pts
         if is_closed
@@ -46,7 +51,9 @@ function mesh_farfield = generate_farfield_mesh(waterline, cfg, nz_layers)
         end
         seg_lens(j) = norm(wl_nodes(j_next, :) - wl_nodes(j, :));
     end
-    if ~is_closed, seg_lens(end) = 0; end
+    if ~is_closed
+        seg_lens(end) = 0;
+    end
 
     total_perimeter = sum(seg_lens);
     cum_s = [0; cumsum(seg_lens(1:end - 1))];
@@ -60,11 +67,15 @@ function mesh_farfield = generate_farfield_mesh(waterline, cfg, nz_layers)
         th_outer = th_start + (th_end - th_start) * (cum_s / cum_s(end));
     end
 
-    % =====================================================================
-    % =====================================================================
-    z_lin = linspace(0, -h, nz_layers + 1);
+% =====================================================================
+% =====================================================================
+    z_lin = linspace(0, -waterDepth, nz_layers + 1);
 
-    if is_closed, n_sectors = n_pts; else, n_sectors = n_pts - 1; end
+    if is_closed
+        n_sectors = n_pts;
+    else
+        n_sectors = n_pts - 1;
+    end
     n_panels = nz_layers * n_sectors;
 
     vertices = zeros(n_panels, 4, 3);
@@ -81,7 +92,9 @@ function mesh_farfield = generate_farfield_mesh(waterline, cfg, nz_layers)
 
         for j = 1:n_sectors
             j_next = j + 1;
-            if j_next > n_pts, j_next = 1; end
+            if j_next > n_pts
+                j_next = 1;
+            end
 
             th1 = th_outer(j);
             th2 = th_outer(j_next);
@@ -101,10 +114,13 @@ function mesh_farfield = generate_farfield_mesh(waterline, cfg, nz_layers)
             centers(p_idx, :) = p_c;
 
             th_c = (th1 + th2) / 2.0;
-            if j_next == 1 && th2 < th1, th_c = (th1 + th2 + 2 * pi) / 2.0; end
+            if j_next == 1 && th2 < th1
+                th_c = (th1 + th2 + 2 * pi) / 2.0;
+            end
             normals(p_idx, :) = [-cos(th_c), -sin(th_c), 0.0];
 
-            d13 = p3 - p1; d24 = p4 - p2;
+            d13 = p3 - p1;
+            d24 = p4 - p2;
             areas(p_idx) = 0.5 * norm(cross(d13, d24));
 
             e1(p_idx, :) = [-sin(th_c), cos(th_c), 0.0];
@@ -124,5 +140,5 @@ function mesh_farfield = generate_farfield_mesh(waterline, cfg, nz_layers)
     mesh_farfield.areas = areas;
     mesh_farfield.e1 = e1;
     mesh_farfield.e2 = e2;
-    mesh_farfield.hydrostatics = struct('Vx', 0, 'Vy', 0, 'Vz', 0, 'V_mean', 0, 'center_of_buoyancy', [0, 0, 0]);
+    mesh_farfield.hydrostatics = struct('Vx', 0,'Vy', 0,'Vz', 0,'V_mean', 0,'center_of_buoyancy', [0, 0, 0]);
 end

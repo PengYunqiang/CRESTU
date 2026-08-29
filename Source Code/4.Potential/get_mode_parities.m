@@ -5,7 +5,8 @@ function parity = get_mode_parities(n_bodies, isx, isy)
 %   parity = get_mode_parities(n_bodies, isx, isy)
 %
 % Description:
-%   The routine implements a component of the linear Rankine boundary-element formulation for incompressible, irrotational gravity-wave flow. Geometry, reflection parity, free-surface impedance, and complex phase follow the project convention exp(i*omega*t).
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
 %   n_bodies           - [scalar] Number of hydrodynamically coupled bodies, dimensionless.
@@ -23,10 +24,15 @@ function parity = get_mode_parities(n_bodies, isx, isy)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    px = [-1, 1, 1, 1, -1, -1]; py = [1, -1, 1, -1, 1, -1];
+    px = [-1, 1, 1, 1, -1, -1];
+    py = [1, -1, 1, -1, 1, -1];
     parity = [repmat(px(:), n_bodies, 1), repmat(py(:), n_bodies, 1)];
-    if ~isx, parity(:, 1) = 1; end
-    if ~isy, parity(:, 2) = 1; end
+    if ~isx
+        parity(:, 1) = 1;
+    end
+    if ~isy
+        parity(:, 2) = 1;
+    end
 end

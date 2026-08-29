@@ -5,7 +5,8 @@ function [k, wavelength] = solve_wave_dispersion(omega, g, depth)
 %   [k, wavelength] = solve_wave_dispersion(omega, g, depth)
 %
 % Description:
-%   The routine implements a component of the linear Rankine boundary-element formulation for incompressible, irrotational gravity-wave flow. Geometry, reflection parity, free-surface impedance, and complex phase follow the project convention exp(i*omega*t).
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
 %   omega              - [scalar] Angular frequency, [rad/s].
@@ -24,15 +25,21 @@ function [k, wavelength] = solve_wave_dispersion(omega, g, depth)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     k = omega^2 / g;
     if depth > 0
         k = max(k, omega / sqrt(g * depth));
         for iter = 1:50
-            kh = k * depth; t = tanh(kh); f = g * k * t - omega^2;
-            df = g * t + g * k * depth / (cosh(kh)^2); candidate = max(k - f / df, eps);
-            if abs(candidate - k) <= 1e-12 * max(1, k), k = candidate; break; end
+            kh = k * depth;
+            t = tanh(kh);
+            dispersionResidual = g * k * t - omega^2;
+            df = g * t + g * k * depth / (cosh(kh)^2);
+            candidate = max(k - dispersionResidual / df, eps);
+            if abs(candidate - k) <= 1e-12 * max(1, k)
+                k = candidate;
+                break;
+            end
             k = candidate;
         end
     end

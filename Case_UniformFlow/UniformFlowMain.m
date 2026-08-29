@@ -1,103 +1,160 @@
-clear; clc; close all;
+% UNIFORMFLOWMAIN Run the closed-sphere Hess-Smith uniform-flow benchmark.
+%
+% Description:
+%   Generates a full-sphere panel mesh, solves the source strengths, checks
+%   pressure and force conservation, exports a reconciliation CSV, and plots
+%   surface and external flow fields. All physical inputs use SI units.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-% =========================================================================
-% 1. 生成全封闭球体物面网格 (Full Sphere, D = 10m)
-% =========================================================================
-mesh_file = 'full_sphere_test.bmf';
-diameter = 10.0;
-N_grid = 8; % 剖分段数 (6 * 4 * N^2 = 1536 面元)
+clear;
+clc;
+close all;
 
-mesh_body = generate_full_sphere_bmf(mesh_file, diameter, 0, 0, N_grid);
+%% Stage 1: Validate project dependencies and output paths
 
-% =========================================================================
-% 2. 启动 Hess-Smith 均匀流求解器 (U_inf = 1.0 m/s 沿 +X)
-% =========================================================================
-U_inf = [1.0, 0.0, 0.0];
-flow_res = solve_uniform_flow(mesh_body, U_inf);
+scriptDirectory = fileparts(mfilename('fullpath'));
+projectDirectory = fileparts(scriptDirectory);
+sourceDirectory = fullfile(projectDirectory,'Source Code');
+assert(isfolder(sourceDirectory),'CRESTU:MissingSourceDirectory', ...
+'Source directory was not found: %s', sourceDirectory);
+addpath(genpath(sourceDirectory));
+addpath(scriptDirectory);
 
-% =========================================================================
-% 3. 物理守恒与受力对标
-% =========================================================================
-rho = 1025.0;
-p_dyn = 0.5 * rho * dot(U_inf, U_inf) .* flow_res.Cp;
-F_hydro = zeros(1, 3);
-for i = 1:mesh_body.n_panels
-    F_hydro = F_hydro - p_dyn(i) * mesh_body.normals(i, :) * mesh_body.areas(i);
+requiredFunctions = {'generate_full_sphere_bmf','solve_uniform_flow', ...
+'compute_flow_field','plot_field_slices','hess_smith_panel_velocity'};
+
+for dependencyIndex = 1:numel(requiredFunctions)
+    assert(exist(requiredFunctions{dependencyIndex},'file') == 2, ...
+'CRESTU:MissingUniformFlowDependency', ...
+'Required function was not found: %s', requiredFunctions{dependencyIndex});
 end
 
-fprintf('\n---------------- 均匀流受力与物理守恒对标 ----------------\n');
-fprintf(' 设定来流速度 U_inf : [%.2f, %.2f, %.2f] m/s\n', U_inf(1), U_inf(2), U_inf(3));
-fprintf(' 表面最大压力系数 Cp_max (驻点理论值 = +1.000) : %8.4f\n', max(flow_res.Cp));
-fprintf(' 表面最小压力系数 Cp_min (赤道理论值 = -1.250) : %8.4f\n', min(flow_res.Cp));
-fprintf(' 闭合体总阻力 Fx (理论值 = 0 N)                  : %10.4e N\n', F_hydro(1));
-fprintf(' 闭合体侧向力 Fy (理论值 = 0 N)                  : %10.4e N\n', F_hydro(2));
-fprintf(' 闭合体升力   Fz (理论值 = 0 N)                  : %10.4e N\n', F_hydro(3));
-fprintf('========================================================\n');
+meshFile = fullfile(scriptDirectory,'full_sphere_test.bmf');
+summaryFile = fullfile(scriptDirectory,'UniformFlow_Reconciliation.csv');
 
-% =========================================================================
-% 4. 提取 Y \approx 0 纵剖线并绘制对标曲线
-% =========================================================================
-centers = mesh_body.centers;
-tol_y = diameter / (2 * N_grid);
-idx_slice = find(abs(centers(:, 2)) < tol_y);
+fprintf('[INFO] Uniform-flow benchmark started.\n');
 
-x_s = centers(idx_slice, 1);
-z_s = centers(idx_slice, 3);
-cp_s = flow_res.Cp(idx_slice);
+%% Stage 2: Generate the closed full-sphere body mesh
 
-th_deg = atan2d(-z_s, -x_s);
-[th_sorted, sort_idx] = sort(th_deg);
-cp_sorted = cp_s(sort_idx);
+sphereDiameter = 10.0; % [m]
+panelDivisionCount = 8; % [-], gives 6 * 4 * N^2 = 1536 panels
+bodyMesh = generate_full_sphere_bmf(meshFile, sphereDiameter, 0, 0, ...
+    panelDivisionCount);
+assert(bodyMesh.n_panels > 0,'CRESTU:EmptyUniformFlowMesh', ...
+'Generated body mesh contains no panels.');
 
-figure('Color', 'w', 'Position', [100, 150, 780, 480], 'Name', 'Cp Validation');
-plot(th_sorted, cp_sorted, 'ro-', 'LineWidth', 1.5, 'MarkerSize', 5.5, 'DisplayName', 'BEM 数值解 (Hess-Smith)');
-hold on; grid on;
+%% Stage 3: Solve the Hess-Smith uniform-flow system
 
-th_theory = linspace(-180, 180, 360);
-cp_theory = 1.0 - 2.25 * sind(th_theory).^2;
-plot(th_theory, cp_theory, 'b--', 'LineWidth', 2.0, 'DisplayName', '解析解: C_p = 1 - 2.25 sin^2\theta');
+freeStreamVelocity = [1.0, 0.0, 0.0]; % [m/s]
+flowResult = solve_uniform_flow(bodyMesh, freeStreamVelocity);
+assert(numel(flowResult.Cp) == bodyMesh.n_panels, ...
+'CRESTU:UniformFlowResultShape', ...
+'Pressure coefficient must contain one value per panel.');
 
-xlabel('经向极角 \theta (deg) [0°: 迎流前缘, \pm90°: 赤道, \pm180°: 尾部]', 'FontSize', 11, 'FontWeight', 'bold');
-ylabel('表面压力系数 C_p', 'FontSize', 11, 'FontWeight', 'bold');
-title('全封闭球体均匀流表面 C_p 对标', 'FontSize', 12);
-legend('Location', 'south');
+%% Stage 4: Check force balance and export reconciliation data
+
+fluidDensity = 1025.0; % [kg/m^3]
+dynamicPressure = 0.5 * fluidDensity * dot(freeStreamVelocity, ...
+    freeStreamVelocity) .* flowResult.Cp; % [Pa]
+hydrodynamicForce = zeros(1, 3); % [N]
+
+for i = 1:bodyMesh.n_panels
+    hydrodynamicForce = hydrodynamicForce - dynamicPressure(i) * ...
+        bodyMesh.normals(i, :) * bodyMesh.areas(i);
+end
+
+maximumPressureCoefficient = max(flowResult.Cp); % [-]
+minimumPressureCoefficient = min(flowResult.Cp); % [-]
+reconciliation = table(bodyMesh.n_panels, sphereDiameter, ...
+    norm(freeStreamVelocity), maximumPressureCoefficient, ...
+    minimumPressureCoefficient, hydrodynamicForce(1), ...
+    hydrodynamicForce(2), hydrodynamicForce(3), ...
+'VariableNames', {'PanelCount','Diameter_m','FreeStreamSpeed_mps', ...
+'CpMaximum','CpMinimum','ForceX_N','ForceY_N','ForceZ_N'});
+
+fprintf('[INFO] Uniform-flow force and conservation summary:\n');
+disp(reconciliation);
+writetable(reconciliation, summaryFile);
+fprintf('[OK] Reconciliation CSV exported | file = %s\n', summaryFile);
+
+%% Stage 5: Plot the meridian pressure-coefficient comparison
+
+panelCenters = bodyMesh.centers; % [m]
+sliceTolerance = sphereDiameter / (2 * panelDivisionCount); % [m]
+slicePanelIndices = find(abs(panelCenters(:, 2)) < sliceTolerance);
+sliceX = panelCenters(slicePanelIndices, 1); % [m]
+sliceZ = panelCenters(slicePanelIndices, 3); % [m]
+slicePressureCoefficient = flowResult.Cp(slicePanelIndices); % [-]
+
+polarAngleDegrees = atan2d(-sliceZ, -sliceX); % [deg]
+[sortedPolarAngleDegrees, sortIndices] = sort(polarAngleDegrees);
+sortedPressureCoefficient = slicePressureCoefficient(sortIndices);
+
+figure('Color','w','Position', [100, 150, 780, 480],'Name','Cp Validation');
+plot(sortedPolarAngleDegrees, sortedPressureCoefficient,'ro-', ...
+'LineWidth', 1.5,'MarkerSize', 5.5, ...
+'DisplayName','BEM solution (Hess-Smith)');
+hold on;
+grid on;
+
+referencePolarAngleDegrees = linspace(-180, 180, 360); % [deg]
+referencePressureCoefficient = 1.0 - ...
+    2.25 * sind(referencePolarAngleDegrees) .^ 2; % [-]
+plot(referencePolarAngleDegrees, referencePressureCoefficient,'b--', ...
+'LineWidth', 2.0,'DisplayName', ...
+'Analytical solution: C_p = 1 - 2.25 sin^2\theta');
+
+xlabel(['Meridian polar angle \theta (deg) [0 deg: upstream, ', ...
+'\pm90 deg: equator, \pm180 deg: downstream]'], ...
+'FontSize', 11,'FontWeight','bold');
+ylabel('Surface pressure coefficient C_p','FontSize', 11,'FontWeight','bold');
+title('Closed-sphere surface C_p validation in uniform flow','FontSize', 12);
+legend('Location','south');
 ylim([-1.4, 1.2]);
 
-%% =========================================================================
-% 5. 三维流场可视化
-% =========================================================================
-fig = figure('Color', 'w', 'Position', [900, 150, 850, 650], 'Name', 'Flow 3D');
-ax = gca; hold(ax, 'on'); grid(ax, 'on'); axis(ax, 'equal');
-view(ax, 135, 25);
-xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
-title('物面压力系数 C_p 云图与流速矢量');
+%% Stage 6: Plot body pressure and surface velocity vectors
 
-X = squeeze(mesh_body.vertices(:, :, 1))';
-Y = squeeze(mesh_body.vertices(:, :, 2))';
-Z = squeeze(mesh_body.vertices(:, :, 3))';
-colormap(ax, jet);
-patch(ax, X, Y, Z, flow_res.Cp', 'FaceColor', 'flat', 'EdgeColor', [0.25 0.25 0.25], 'LineWidth', 0.2);
-cbar = colorbar(ax);
-cbar.Label.String = 'C_p';
+figureHandle = figure('Color','w','Position', [900, 150, 850, 650], ...
+'Name','Flow 3D');
+axesHandle = axes(figureHandle);
+hold(axesHandle,'on');
+grid(axesHandle,'on');
+axis(axesHandle,'equal');
+view(axesHandle, 135, 25);
+xlabel(axesHandle,'X (m)');
+ylabel(axesHandle,'Y (m)');
+zlabel(axesHandle,'Z (m)');
+title(axesHandle,'Body-surface C_p contours and velocity vectors');
 
-step = 1;
-quiver3(ax, mesh_body.centers(1:step:end, 1), ...
-            mesh_body.centers(1:step:end, 2), ...
-            mesh_body.centers(1:step:end, 3), ...
-            flow_res.V_total(1:step:end, 1), ...
-            flow_res.V_total(1:step:end, 2), ...
-            flow_res.V_total(1:step:end, 3), 1.2, 'k', 'LineWidth', 1.0);
+surfaceX = squeeze(bodyMesh.vertices(:, :, 1))'; % [m]
+surfaceY = squeeze(bodyMesh.vertices(:, :, 2))'; % [m]
+surfaceZ = squeeze(bodyMesh.vertices(:, :, 3))'; % [m]
+colormap(axesHandle, jet);
+patch(axesHandle, surfaceX, surfaceY, surfaceZ, flowResult.Cp', ...
+'FaceColor','flat','EdgeColor', [0.25 0.25 0.25],'LineWidth', 0.2);
+colorbarHandle = colorbar(axesHandle);
+colorbarHandle.Label.String ='C_p';
 
-% =========================================================================
-% 流场外点诱导速度计算与切片可视化 (调用示例)
-% =========================================================================
-% 设定计算域为直径的 2 倍范围 ([-D, D])
-domain_lim = diameter; 
-grid_res   = 41; % 网格分辨率
+vectorStride = 1;
+quiver3(axesHandle, bodyMesh.centers(1:vectorStride:end, 1), ...
+    bodyMesh.centers(1:vectorStride:end, 2), ...
+    bodyMesh.centers(1:vectorStride:end, 3), ...
+    flowResult.V_total(1:vectorStride:end, 1), ...
+    flowResult.V_total(1:vectorStride:end, 2), ...
+    flowResult.V_total(1:vectorStride:end, 3), ...
+    1.2,'k','LineWidth', 1.0);
 
-fprintf('>>> 正在生成流场网格并计算诱导速度场...\n');
-[X_grid, Y_grid, Z_grid, V_field, Cp_field] = compute_flow_field(...
-    mesh_body, flow_res.sigma, U_inf, domain_lim, grid_res);
+%% Stage 7: Evaluate and plot external flow-field slices
 
-% 绘制 Y=0 纵剖面与 Z=0 水平切面的速度模长云图与流线
-plot_field_slices(X_grid, Y_grid, Z_grid, V_field, Cp_field, mesh_body, diameter);
+domainHalfWidth = sphereDiameter; % [m]
+gridPointCount = 41; % [-]
+fprintf('[INFO] Generate the external flow grid | points per axis = %d\n', ...
+    gridPointCount);
+[xGrid, yGrid, zGrid, velocityField, pressureCoefficientField] = ...
+    compute_flow_field(bodyMesh, flowResult.sigma, freeStreamVelocity, ...
+    domainHalfWidth, gridPointCount);
+plot_field_slices(xGrid, yGrid, zGrid, velocityField, ...
+    pressureCoefficientField, bodyMesh, sphereDiameter);
+
+fprintf('[OK] Uniform-flow benchmark completed.\n');

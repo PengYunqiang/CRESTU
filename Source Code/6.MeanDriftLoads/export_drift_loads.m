@@ -5,7 +5,8 @@ function output = export_drift_loads(filename, omegas, headings, near_loads, far
 %   output = export_drift_loads(filename, omegas, headings, near_loads, far_loads, rho, g, wave_amplitude, L)
 %
 % Description:
-%   The routine evaluates, reconstructs, imports, or exports quantities required by second-order mean wave-drift analysis. Complex products are time averaged consistently with the exp(i*omega*t) convention and generalized loads use the project 6-DOF ordering.
+%   Computes or processes second-order mean wave-drift quantities.
+%   Complex averages follow exp(i*omega*t) and the 6-DOF order.
 %
 % Inputs:
 %   filename           - [character vector or string scalar] Input or output file path.
@@ -29,34 +30,62 @@ function output = export_drift_loads(filename, omegas, headings, near_loads, far
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     force_scale = 0.5 * rho * g * wave_amplitude^2 * L;
     moment_scale = force_scale * L;
-    nf = numel(omegas); nh = numel(headings); ndof = size(near_loads, 1);
+    nf = numel(omegas);
+    nh = numel(headings);
+    ndof = size(near_loads, 1);
     if mod(ndof, 6) ~= 0 || size(far_loads, 1) ~= 6
-        error('CRESTU:DriftExportShape', 'Near loads require 6N rows and global far-field loads require 6 rows.');
+        error('CRESTU:DriftExportShape','Near loads require 6N rows and global far-field loads require 6 rows.');
     end
-    rows = nf * nh * (ndof + 6); frequency = zeros(rows, 1); heading = zeros(rows, 1);
-    method = strings(rows, 1); body = zeros(rows, 1); dof = zeros(rows, 1); load_value = zeros(rows, 1); cursor = 0;
+    rows = nf * nh * (ndof + 6);
+    frequency = zeros(rows, 1);
+    heading = zeros(rows, 1);
+    method = strings(rows, 1);
+    body = zeros(rows, 1);
+    dof = zeros(rows, 1);
+    load_value = zeros(rows, 1);
+    cursor = 0;
     for k = 1:nf
-        for h = 1:nh
-            idx = cursor + (1:ndof); frequency(idx) = omegas(k); heading(idx) = headings(h);
-            method(idx) = "near_field"; body(idx) = repelem((1:ndof / 6).', 6); dof(idx) = repmat((1:6).', ndof / 6, 1);
-            load_value(idx) = near_loads(:, h, k); cursor = cursor + ndof;
-            idx = cursor + (1:6); frequency(idx) = omegas(k); heading(idx) = headings(h);
-            method(idx) = "far_field_global"; body(idx) = 0; dof(idx) = (1:6).';
-            load_value(idx) = far_loads(:, h, k); cursor = cursor + 6;
+        for headingIndex = 1:nh
+            idx = cursor + (1:ndof);
+            frequency(idx) = omegas(k);
+            heading(idx) = headings(headingIndex);
+            method(idx) ="near_field";
+            body(idx) = repelem((1:ndof / 6).', 6);
+            dof(idx) = repmat((1:6).', ndof / 6, 1);
+            load_value(idx) = near_loads(:, headingIndex, k);
+            cursor = cursor + ndof;
+            idx = cursor + (1:6);
+            frequency(idx) = omegas(k);
+            heading(idx) = headings(headingIndex);
+            method(idx) ="far_field_global";
+            body(idx) = 0;
+            dof(idx) = (1:6).';
+            load_value(idx) = far_loads(:, headingIndex, k);
+            cursor = cursor + 6;
         end
     end
-    scale = force_scale * ones(rows, 1); scale(dof > 3) = moment_scale;
+    scale = force_scale * ones(rows, 1);
+    scale(dof > 3) = moment_scale;
     output = table(frequency, heading, method, body, dof, load_value, load_value ./ scale, ...
-        'VariableNames', {'omega_rad_s', 'heading_deg', 'method', 'body', 'dof', 'load', 'Cd'});
-    [folder, ~, ext] = fileparts(filename); if ~isempty(folder) && ~exist(folder, 'dir'), mkdir(folder); end
-    switch lower(ext)
-        case '.csv', writetable(output, filename);
-        case '.mat', save(filename, 'output', 'force_scale', 'moment_scale');
-        otherwise, error('CRESTU:DriftExportFormat', 'Use .csv or .mat for drift-load export.');
+'VariableNames', {'omega_rad_s','heading_deg','method','body','dof','load','Cd'});
+    [folder, ~, ext] = fileparts(filename);
+    if ~isempty(folder) && ~exist(folder,'dir')
+        mkdir(folder);
     end
-    fprintf('>>> Mean drift loads exported: %s\n', filename);
+    switch lower(ext)
+        case '.csv'
+            writetable(output, filename);
+
+        case '.mat'
+            save(filename,'output','force_scale','moment_scale');
+
+        otherwise
+            error('CRESTU:DriftExportFormat', ...
+'Use .csv or .mat for drift-load export.');
+    end
+    fprintf('[OK] Mean drift loads exported: %s\n', filename);
 end

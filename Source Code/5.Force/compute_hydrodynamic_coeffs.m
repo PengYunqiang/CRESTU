@@ -5,7 +5,8 @@ function [added_mass, damping, diagnostics] = compute_hydrodynamic_coeffs(phi_ra
 %   [added_mass, damping, diagnostics] = compute_hydrodynamic_coeffs(phi_radiation, nj, areas, omega, rho, varargin)
 %
 % Description:
-%   The routine converts first-order potential-flow or rigid-body data into generalized hydrodynamic coefficients, loads, restoring terms, or motions. Translational and rotational quantities retain the global 6-DOF ordering used by CRESTU.
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
 %   phi_radiation      - [N x Ndof] Complex radiation potentials, [m^2/s].
@@ -28,22 +29,22 @@ function [added_mass, damping, diagnostics] = compute_hydrodynamic_coeffs(phi_ra
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    validateattributes(omega, {'numeric'}, {'scalar', 'real', 'positive', 'finite'});
-    validateattributes(rho, {'numeric'}, {'scalar', 'real', 'positive', 'finite'});
+    validateattributes(omega, {'numeric'}, {'scalar','real','positive','finite'});
+    validateattributes(rho, {'numeric'}, {'scalar','real','positive','finite'});
     areas = reshape(areas, [], 1);
     if size(phi_radiation, 1) ~= size(nj, 1) || numel(areas) ~= size(nj, 1)
-        error('CRESTU:ForceShape', 'Potential, generalized normals, and areas have inconsistent rows.');
+        error('CRESTU:ForceShape','Potential, generalized normals, and areas have inconsistent rows.');
     end
     if size(phi_radiation, 2) ~= size(nj, 2)
-        error('CRESTU:RadiationModes', 'Radiation potential must have one column per generalized mode.');
+        error('CRESTU:RadiationModes','Radiation potential must have one column per generalized mode.');
     end
     potential_integrals = nj.' * (phi_radiation .* areas);
     symmetry_weights = ones(size(potential_integrals));
     if ~isempty(varargin)
         symmetry = varargin{1};
-        if isstruct(symmetry) && isfield(symmetry, 'mode_parity')
+        if isstruct(symmetry) && isfield(symmetry,'mode_parity')
             symmetry_weights = symmetry_force_weights(symmetry.mode_parity, ...
                 symmetry.mode_parity, symmetry.isx, symmetry.isy);
             potential_integrals = potential_integrals .* symmetry_weights;
@@ -52,21 +53,22 @@ function [added_mass, damping, diagnostics] = compute_hydrodynamic_coeffs(phi_ra
     radiation_force = -1i * omega * rho * potential_integrals;
     added_mass_raw = real(radiation_force) / (omega^2);
     damping_raw = -imag(radiation_force) / omega;
-    scaleA = max(norm(added_mass_raw, 'fro'), eps); scaleB = max(norm(damping_raw, 'fro'), eps);
-    raw_added_mass_symmetry_error = norm(added_mass_raw - added_mass_raw.', 'fro') / scaleA;
-    raw_damping_symmetry_error = norm(damping_raw - damping_raw.', 'fro') / scaleB;
+    scaleA = max(norm(added_mass_raw,'fro'), eps);
+    scaleB = max(norm(damping_raw,'fro'), eps);
+    raw_added_mass_symmetry_error = norm(added_mass_raw - added_mass_raw.','fro') / scaleA;
+    raw_damping_symmetry_error = norm(damping_raw - damping_raw.','fro') / scaleB;
 
-    % Enforce the reciprocal projection after retaining the raw residual as
-    % a mesh/solver diagnostic. This is the nearest Frobenius-norm matrix
-    % satisfying the potential-flow reciprocity identities A=A' and B=B'.
+% Enforce the reciprocal projection after retaining the raw residual as
+% a mesh/solver diagnostic. This is the nearest Frobenius-norm matrix
+% satisfying the potential-flow reciprocity identities A=A' and B=B'.
     added_mass = 0.5 * (added_mass_raw + added_mass_raw.');
     damping = 0.5 * (damping_raw + damping_raw.');
     diagnostics = struct('radiation_force', radiation_force, ...
-        'raw_added_mass_symmetry_error', raw_added_mass_symmetry_error, ...
-        'raw_damping_symmetry_error', raw_damping_symmetry_error, ...
-        'added_mass_symmetry_error', norm(added_mass - added_mass.', 'fro') / scaleA, ...
-        'damping_symmetry_error', norm(damping - damping.', 'fro') / scaleB, ...
-        'min_added_mass_diagonal', min(real(diag(added_mass))), ...
-        'min_damping_diagonal', min(real(diag(damping))), ...
-        'symmetry_weights', symmetry_weights);
+'raw_added_mass_symmetry_error', raw_added_mass_symmetry_error, ...
+'raw_damping_symmetry_error', raw_damping_symmetry_error, ...
+'added_mass_symmetry_error', norm(added_mass - added_mass.','fro') / scaleA, ...
+'damping_symmetry_error', norm(damping - damping.','fro') / scaleB, ...
+'min_added_mass_diagonal', min(real(diag(added_mass))), ...
+'min_damping_diagonal', min(real(diag(damping))), ...
+'symmetry_weights', symmetry_weights);
 end

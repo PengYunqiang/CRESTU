@@ -5,7 +5,8 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
 %   mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   filename           - [character vector or string scalar] Input or output file path.
@@ -23,9 +24,11 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if nargin < 1 || isempty(filename), filename = cfg.files.fs; end
+    if nargin < 1 || isempty(filename)
+        filename = cfg.files.fs;
+    end
 
     nr_near = cfg.fs.nr_near;
     nr_sponge = cfg.fs.nr_sponge;
@@ -39,8 +42,8 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
     is_closed = waterline.is_closed;
     nr_total = nr_near + nr_sponge;
 
-    % =====================================================================
-    % =====================================================================
+% =====================================================================
+% =====================================================================
     seg_lens = zeros(n_pts, 1);
     for j = 1:n_pts
         if is_closed
@@ -50,7 +53,9 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
         end
         seg_lens(j) = norm(wl_nodes(j_next, :) - wl_nodes(j, :));
     end
-    if ~is_closed, seg_lens(end) = 0; end
+    if ~is_closed
+        seg_lens(end) = 0;
+    end
 
     total_perimeter = sum(seg_lens);
     cum_s = [0; cumsum(seg_lens(1:end - 1))];
@@ -66,12 +71,12 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
 
     outer_pts = [r_outer * cos(th_outer), r_outer * sin(th_outer)];
 
-    % =====================================================================
-    % =====================================================================
-    % The old implementation hard-coded the near region to 55% of the
-    % entire radius.  Once Rout was enlarged, damping began inside an
-    % under-resolved near field.  Build each ray so row NR_near+1 lies
-    % exactly on R_inner, followed by a geometrically stretched sponge.
+% =====================================================================
+% =====================================================================
+% The old implementation hard-coded the near region to 55% of the
+% entire radius.  Once Rout was enlarged, damping began inside an
+% under-resolved near field.  Build each ray so row NR_near+1 lies
+% exactly on R_inner, followed by a geometrically stretched sponge.
     near_coordinate = linspace(0, 1, nr_near + 1);
     sp_ratios = sponge_ratio .^ (0:nr_sponge - 1);
     sponge_coordinate = cumsum(sp_ratios / sum(sp_ratios));
@@ -89,25 +94,30 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
         grid_y(:, j) = (1 - weights(:)) * wl_nodes(j, 2) + weights(:) * outer_pts(j, 2);
     end
 
-    % =====================================================================
-    % =====================================================================
+% =====================================================================
+% =====================================================================
     max_iter = 250;
     omega = 1.15;
 
     for iter = 1:max_iter
         for i = 2:nr_total
-            if i == nr_near + 1, continue; end
+            if i == nr_near + 1
+                continue;
+            end
             for j = 1:n_pts
                 if is_closed
                     j_m = mod(j - 2 + n_pts, n_pts) + 1;
                     j_p = mod(j, n_pts) + 1;
                 else
                     if j == 1
-                        j_m = 2; j_p = 2;
+                        j_m = 2;
+                        j_p = 2;
                     elseif j == n_pts
-                        j_m = n_pts - 1; j_p = n_pts - 1;
+                        j_m = n_pts - 1;
+                        j_p = n_pts - 1;
                     else
-                        j_m = j - 1; j_p = j + 1;
+                        j_m = j - 1;
+                        j_p = j + 1;
                     end
                 end
 
@@ -146,9 +156,13 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
         end
     end
 
-    % =====================================================================
-    % =====================================================================
-    if is_closed, n_sectors = n_pts; else, n_sectors = n_pts - 1; end
+% =====================================================================
+% =====================================================================
+    if is_closed
+        n_sectors = n_pts;
+    else
+        n_sectors = n_pts - 1;
+    end
     n_panels = nr_total * n_sectors;
 
     vertices = zeros(n_panels, 4, 3);
@@ -163,7 +177,9 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
     for i = 1:nr_total
         for j = 1:n_sectors
             j_next = j + 1;
-            if j_next > n_pts, j_next = 1; end
+            if j_next > n_pts
+                j_next = 1;
+            end
 
             p1 = [grid_x(i, j), grid_y(i, j), 0.0];
             p2 = [grid_x(i + 1, j), grid_y(i + 1, j), 0.0];
@@ -180,7 +196,8 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
             centers(p_idx, :) = p_c;
             normals(p_idx, :) = [0.0, 0.0, 1.0];
 
-            d13 = p3 - p1; d24 = p4 - p2;
+            d13 = p3 - p1;
+            d24 = p4 - p2;
             areas(p_idx) = 0.5 * norm(cross(d13, d24));
 
             v_rad = (p2 + p3) / 2 - (p1 + p4) / 2;
@@ -210,7 +227,7 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
     mesh_fs.e1 = e1;
     mesh_fs.e2 = e2;
     mesh_fs.mu_damping = mu_layer;
-    mesh_fs.hydrostatics = struct('Vx', 0, 'Vy', 0, 'Vz', 0, 'V_mean', 0, 'center_of_buoyancy', [0, 0, 0]);
+    mesh_fs.hydrostatics = struct('Vx', 0,'Vy', 0,'Vz', 0,'V_mean', 0,'center_of_buoyancy', [0, 0, 0]);
 
     write_bmf(filename, mesh_fs);
 end

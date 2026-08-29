@@ -1,64 +1,130 @@
 function result = solve_uniform_flow(mesh_body, U_inf)
-    np      = mesh_body.n_panels;
-    centers = mesh_body.centers;
-    normals = mesh_body.normals;
-    verts   = mesh_body.vertices;
-    e1_all  = mesh_body.e1;
-    e2_all  = mesh_body.e2;
+% SOLVE_UNIFORM_FLOW Solve the Hess-Smith source-panel system for steady uniform flow.
+%
+% Syntax:
+%   result = solve_uniform_flow(mesh_body, U_inf)
+%
+% Description:
+%   Solve the Hess-Smith source-panel system for steady uniform flow.
+%   The implementation preserves the CRESTU solver and data-field contracts.
+%
+% Inputs:
+%   mesh_body - Body-panel mesh structure with coordinates in meters [m].
+%   U_inf - Free-stream velocity vector, [1 x 3] [m/s].
+%
+% Outputs:
+%   result - Computed hydrodynamic result structure [-].
+%
+% Governing Equations / Theory:
+%   Uses the linear potential-flow, source-panel, or post-processing
+%   formulation stated in the CRESTU theory and technical manual.
+%
+% References:
+%   - CRESTU theory and technical manual.
+%   - Standard boundary-element and marine hydrodynamics references.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+    arguments
+        mesh_body (1, 1) struct
+        U_inf (1, 3) double {mustBeFinite}
+    end
 
-    fprintf('>>> 正在组装 BEM 影响矩阵 (N = %d)...\n', np);
-    tic;
+    %% Stage 1: Validate inputs and geometry
 
-    A = zeros(np, np);
-    b = -normals * U_inf(:); % 向量化右端项
+    requiredFields = {'n_panels','centers','normals','vertices','e1','e2'};
 
-    % 缓存 3D 诱导速度影响矩阵，避免后处理二次遍历
-    Vx_mat = zeros(np, np);
-    Vy_mat = zeros(np, np);
-    Vz_mat = zeros(np, np);
+    for fieldIndex = 1:numel(requiredFields)
+        assert(isfield(mesh_body, requiredFields{fieldIndex}), ...
+'CRESTU:UniformFlowMeshField', ...
+'Body mesh is missing field "%s".', requiredFields{fieldIndex});
+    end
 
-    parfor i = 1:np
-        x_i = centers(i, :);
-        n_i = normals(i, :);
-        
-        row_A  = zeros(1, np);
-        row_Vx = zeros(1, np);
-        row_Vy = zeros(1, np);
-        row_Vz = zeros(1, np);
-        
-        row_A(i) = 0.5; % 自感应跳跃项
+    panelCount = mesh_body.n_panels;
+    assert(panelCount > 0,'CRESTU:UniformFlowEmptyMesh', ...
+'The body mesh must contain at least one panel.');
+    assert(isequal(size(mesh_body.centers), [panelCount, 3]), ...
+'CRESTU:UniformFlowCenterShape', ...
+'Body centers must have size [N_panels x 3].');
+    assert(isequal(size(mesh_body.normals), [panelCount, 3]), ...
+'CRESTU:UniformFlowNormalShape', ...
+'Body normals must have size [N_panels x 3].');
+    assert(size(mesh_body.vertices, 1) == panelCount && ...
+        size(mesh_body.vertices, 2) == 4 && size(mesh_body.vertices, 3) == 3, ...
+'CRESTU:UniformFlowVertexShape', ...
+'Body vertices must have size [N_panels x 4 x 3].');
+    assert(dot(U_inf, U_inf) > 0,'CRESTU:UniformFlowZeroSpeed', ...
+'Free-stream speed must be positive.');
 
-        for j = 1:np
+    panelCenters = mesh_body.centers; % [m]
+    panelNormals = mesh_body.normals; % [-]
+    panelVertices = mesh_body.vertices; % [m]
+    panelTangentOne = mesh_body.e1; % [-]
+    panelTangentTwo = mesh_body.e2; % [-]
+
+    %% Stage 2: Assemble the Hess-Smith influence matrices
+
+    fprintf('[INFO] Assemble the BEM influence matrix | panels = %d\n', panelCount);
+    assemblyTimer = tic;
+
+    A = zeros(panelCount, panelCount); % Normal-velocity influence matrix [-]
+    boundaryRhs = -panelNormals * U_inf(:); % Boundary normal velocity [m/s]
+    velocityInfluenceX = zeros(panelCount, panelCount); % [-]
+    velocityInfluenceY = zeros(panelCount, panelCount); % [-]
+    velocityInfluenceZ = zeros(panelCount, panelCount); % [-]
+
+    parfor i = 1:panelCount
+        fieldPoint = panelCenters(i, :); % [m]
+        fieldNormal = panelNormals(i, :); % [-]
+        normalInfluenceRow = zeros(1, panelCount);
+        velocityInfluenceXRow = zeros(1, panelCount);
+        velocityInfluenceYRow = zeros(1, panelCount);
+        velocityInfluenceZRow = zeros(1, panelCount);
+
+        normalInfluenceRow(i) = 0.5; % Self-influence jump term.
+
+        for j = 1:panelCount
             if i ~= j
-                P_j = squeeze(verts(j, :, :));
-                [u_ij, v_ij, w_ij] = hess_smith_panel_velocity(P_j, x_i, ...
-                                        centers(j, :), e1_all(j, :), e2_all(j, :), normals(j, :));
-                
-                row_Vx(j) = u_ij;
-                row_Vy(j) = v_ij;
-                row_Vz(j) = w_ij;
-                row_A(j)  = u_ij * n_i(1) + v_ij * n_i(2) + w_ij * n_i(3);
+                sourcePanelVertices = squeeze(panelVertices(j, :, :)); % [m]
+                [inducedVelocityX, inducedVelocityY, inducedVelocityZ] = ...
+                    hess_smith_panel_velocity(sourcePanelVertices, fieldPoint, ...
+                    panelCenters(j, :), panelTangentOne(j, :), ...
+                    panelTangentTwo(j, :), panelNormals(j, :));
+
+                velocityInfluenceXRow(j) = inducedVelocityX;
+                velocityInfluenceYRow(j) = inducedVelocityY;
+                velocityInfluenceZRow(j) = inducedVelocityZ;
+                normalInfluenceRow(j) = inducedVelocityX * fieldNormal(1) + ...
+                    inducedVelocityY * fieldNormal(2) + ...
+                    inducedVelocityZ * fieldNormal(3);
             end
         end
-        
-        A(i, :)      = row_A;
-        Vx_mat(i, :) = row_Vx;
-        Vy_mat(i, :) = row_Vy;
-        Vz_mat(i, :) = row_Vz;
+
+        A(i, :) = normalInfluenceRow;
+        velocityInfluenceX(i, :) = velocityInfluenceXRow;
+        velocityInfluenceY(i, :) = velocityInfluenceYRow;
+        velocityInfluenceZ(i, :) = velocityInfluenceZRow;
     end
-    fprintf('>>> 影响矩阵组装完成, 耗时: %.2f 秒\n', toc);
 
-    % 线性求解源强
-    sigma = A \ b;
+    fprintf('[OK] Influence matrix assembled | elapsed = %.2f s\n', toc(assemblyTimer));
 
-    % 后处理：通过矩阵乘法直接得到诱导速度 (耗时 < 0.01s)
-    V_ind = [Vx_mat * sigma, Vy_mat * sigma, Vz_mat * sigma];
-    V_total = repmat(U_inf, np, 1) + V_ind + 0.5 * (sigma .* normals);
+    %% Stage 3: Solve source strengths and recover surface velocity
 
-    U_mag2 = dot(U_inf, U_inf);
-    Cp = 1.0 - sum(V_total.^2, 2) / U_mag2;
+    sourceStrength = A \ boundaryRhs; % [m/s]
+    inducedVelocity = [velocityInfluenceX * sourceStrength, ...
+        velocityInfluenceY * sourceStrength, ...
+        velocityInfluenceZ * sourceStrength]; % [m / s]
+    totalVelocity = repmat(U_inf, panelCount, 1) + inducedVelocity + ...
+        0.5 * (sourceStrength .* panelNormals); % [m/s]
+    freeStreamSpeedSquared = dot(U_inf, U_inf); % [m^2/s^2]
+    pressureCoefficient = 1.0 - ...
+        sum(totalVelocity .^ 2, 2) / freeStreamSpeedSquared; % [-]
 
-    result.sigma   = sigma;
-    result.V_total = V_total;
-    result.Cp      = Cp;
+    %% Stage 4: Preserve the public result-field contract
+
+    result = struct();
+    result.sigma = sourceStrength;
+    result.V_total = totalVelocity;
+    result.Cp = pressureCoefficient;
+
+    fprintf('[OK] Uniform-flow solution completed | panels = %d\n', panelCount);
 end

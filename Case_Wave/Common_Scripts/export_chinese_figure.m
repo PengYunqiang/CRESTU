@@ -13,16 +13,21 @@ function export_chinese_figure(figure_handle, filename)
 %
 % Mathematical Reference:
 %   Visualization utility; no mathematical model is used.
+%% Stage 1: Initialize inputs and dependencies
+
     output_folder = fileparts(filename);
     if ~isempty(output_folder) && ~isfolder(output_folder)
         mkdir(output_folder);
     end
-    set(findall(figure_handle, '-property', 'FontName'), 'FontName', 'Microsoft YaHei');
-    set(findall(figure_handle, '-property', 'FontSize'), 'FontSize', 10);
-    axes_handles = findall(figure_handle, 'Type', 'axes');
+    set(findall(figure_handle,'-property','FontName'),'FontName','Microsoft YaHei');
+    set(findall(figure_handle,'-property','FontSize'),'FontSize', 10);
+
+%% Stage 2: Run the core calculation
+
+    axes_handles = findall(figure_handle,'Type','axes');
     for axes_index = 1:numel(axes_handles)
         disableDefaultInteractivity(axes_handles(axes_index));
-        axes_handles(axes_index).Toolbar.Visible = 'off';
+        axes_handles(axes_index).Toolbar.Visible ='off';
     end
-    exportgraphics(figure_handle, filename, 'Resolution', 300);
+    exportgraphics(figure_handle, filename,'Resolution', 300);
 end

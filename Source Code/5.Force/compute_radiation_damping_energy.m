@@ -6,7 +6,8 @@ function [damping, diagnostics] = compute_radiation_damping_energy( ...
 %   [damping, diagnostics] = compute_radiation_damping_energy(phi_radiation, nj, centers, normals, areas, omega, cfg, mode_parity, n_theta)
 %
 % Description:
-%   The routine converts first-order potential-flow or rigid-body data into generalized hydrodynamic coefficients, loads, restoring terms, or motions. Translational and rotational quantities retain the global 6-DOF ordering used by CRESTU.
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
 %   phi_radiation      - [N x Ndof] Complex radiation potentials, [m^2/s].
@@ -31,10 +32,13 @@ function [damping, diagnostics] = compute_radiation_damping_energy( ...
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if nargin < 9 || isempty(n_theta), n_theta = 72; end
-    headings = (0:n_theta - 1) * (360 / n_theta); dtheta = 2 * pi / n_theta;
+    if nargin < 9 || isempty(n_theta)
+        n_theta = 72;
+    end
+    headings = (0:n_theta - 1) * (360 / n_theta);
+    dtheta = 2 * pi / n_theta;
     force = compute_haskind_excitation(phi_radiation, nj, centers, normals, areas, ...
         omega, cfg, headings, mode_parity);
     [wave_number, ~] = solve_wave_dispersion(omega, cfg.grav, cfg.water_depth);
@@ -47,11 +51,12 @@ function [damping, diagnostics] = compute_radiation_damping_energy( ...
     prefactor = omega * wave_number / (4 * pi * cfg.rho * cfg.grav^2 * depth_factor);
     damping = real(prefactor * (force * force') * dtheta);
     damping = 0.5 * (damping + damping.');
-    eigenvalues = eig(damping); tolerance = 1e-10 * max(1, max(abs(eigenvalues)));
+    eigenvalues = eig(damping);
+    tolerance = 1e-10 * max(1, max(abs(eigenvalues)));
     if min(eigenvalues) < -tolerance
-        warning('CRESTU:EnergyDampingPSD', 'Energy damping has minimum eigenvalue %g.', min(eigenvalues));
+        warning('CRESTU:EnergyDampingPSD','Energy damping has minimum eigenvalue %g.', min(eigenvalues));
     end
-    diagnostics = struct('method', 'Haskind energy flux', 'headings', headings, ...
-        'haskind_excitation', force, 'depth_factor', depth_factor, 'wavenumber', wave_number, ...
-        'min_eigenvalue', min(eigenvalues));
+    diagnostics = struct('method','Haskind energy flux','headings', headings, ...
+'haskind_excitation', force,'depth_factor', depth_factor,'wavenumber', wave_number, ...
+'min_eigenvalue', min(eigenvalues));
 end

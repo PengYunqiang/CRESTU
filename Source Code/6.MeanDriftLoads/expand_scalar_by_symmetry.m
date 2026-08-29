@@ -5,7 +5,8 @@ function expanded = expand_scalar_by_symmetry(values, parity, isx, isy)
 %   expanded = expand_scalar_by_symmetry(values, parity, isx, isy)
 %
 % Description:
-%   The routine evaluates, reconstructs, imports, or exports quantities required by second-order mean wave-drift analysis. Complex products are time averaged consistently with the exp(i*omega*t) convention and generalized loads use the project 6-DOF ordering.
+%   Computes or processes second-order mean wave-drift quantities.
+%   Complex averages follow exp(i*omega*t) and the 6-DOF order.
 %
 % Inputs:
 %   values             - [numeric array] Samples to be transformed or interpolated; units are preserved.
@@ -24,18 +25,27 @@ function expanded = expand_scalar_by_symmetry(values, parity, isx, isy)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if isempty(values), expanded = values; return; end
+    if isempty(values)
+        expanded = values;
+        return;
+    end
     parity = reshape(parity, size(values, 2), 2);
     flags = [0, 0];
-    if isx, flags = [flags;1, 0]; end
-    if isy, flags = [flags;0, 1]; end
-    if isx && isy, flags = [0, 0;1, 0;0, 1;1, 1]; end
+    if isx
+        flags = [flags;1, 0];
+    end
+    if isy
+        flags = [flags;0, 1];
+    end
+    if isx && isy
+        flags = [0, 0;1, 0;0, 1;1, 1];
+    end
     expanded = complex(zeros(size(values, 1) * size(flags, 1), size(values, 2)));
-    for q = 1:size(flags, 1)
-        rows = (q - 1) * size(values, 1) + (1:size(values, 1));
-        weights = (parity(:, 1) .^ flags(q, 1)) .* (parity(:, 2) .^ flags(q, 2));
+    for imageIndex = 1:size(flags, 1)
+        rows = (imageIndex - 1) * size(values, 1) + (1:size(values, 1));
+        weights = (parity(:, 1) .^ flags(imageIndex, 1)) .* (parity(:, 2) .^ flags(imageIndex, 2));
         expanded(rows, :) = values .* weights.';
     end
 end

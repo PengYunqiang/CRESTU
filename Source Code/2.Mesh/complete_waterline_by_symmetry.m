@@ -5,7 +5,8 @@ function full_waterline = complete_waterline_by_symmetry(waterline, isx, isy)
 %   full_waterline = complete_waterline_by_symmetry(waterline, isx, isy)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   waterline          - [struct] Ordered waterline nodes and segment metadata, with coordinates in [m].
@@ -23,14 +24,20 @@ function full_waterline = complete_waterline_by_symmetry(waterline, isx, isy)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     points = waterline.nodes;
-    if isx, points = [points;[-points(:, 1), points(:, 2)]]; end
-    if isy, points = [points;[points(:, 1), -points(:, 2)]]; end
-    points = uniquetol(points, 1e-9, 'ByRows', true);
-    center = mean(points, 1); angles = atan2(points(:, 2) - center(2), points(:, 1) - center(1));
-    [~, order] = sort(angles); points = points(order, :);
-    full_waterline = struct('nodes', points, 'theta', atan2(points(:, 2), points(:, 1)), ...
-        'r', sqrt(sum(points .^ 2, 2)), 'n_pts', size(points, 1), 'is_closed', true);
+    if isx
+        points = [points;[-points(:, 1), points(:, 2)]];
+    end
+    if isy
+        points = [points;[points(:, 1), -points(:, 2)]];
+    end
+    points = uniquetol(points, 1e-9,'ByRows', true);
+    center = mean(points, 1);
+    angles = atan2(points(:, 2) - center(2), points(:, 1) - center(1));
+    [~, order] = sort(angles);
+    points = points(order, :);
+    full_waterline = struct('nodes', points,'theta', atan2(points(:, 2), points(:, 1)), ...
+'r', sqrt(sum(points .^ 2, 2)),'n_pts', size(points, 1),'is_closed', true);
 end

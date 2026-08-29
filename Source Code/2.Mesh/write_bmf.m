@@ -5,7 +5,8 @@ function write_bmf(filename, mesh)
 %   write_bmf(filename, mesh)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   filename           - [character vector or string scalar] Input or output file path.
@@ -22,9 +23,9 @@ function write_bmf(filename, mesh)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    fid = fopen(filename, 'w');
+    fid = fopen(filename,'w');
     if fid == -1
         error('Unable to create the BMF file: %s', filename);
     end
@@ -36,18 +37,18 @@ function write_bmf(filename, mesh)
         main_type = 0;
     end
 
-    fprintf(fid, '%s\n', mesh.header);
-    fprintf(fid, '%16.6E %5d\n', mesh.ulen, main_type);
-    fprintf(fid, '%5d %5d\n', mesh.isx, mesh.isy);
-    fprintf(fid, '%8d\n', mesh.n_panels);
+    fprintf(fid,'%s\n', mesh.header);
+    fprintf(fid,'%16.6E %5d\n', mesh.ulen, main_type);
+    fprintf(fid,'%5d %5d\n', mesh.isx, mesh.isy);
+    fprintf(fid,'%8d\n', mesh.n_panels);
 
     for k = 1:mesh.n_panels
-        for v = 1:4
-            fprintf(fid, '%18.9E %18.9E %18.9E\n', ...
-                mesh.vertices(k, v, 1), mesh.vertices(k, v, 2), mesh.vertices(k, v, 3));
+        for vertexIndex = 1:4
+            fprintf(fid,'%18.9E %18.9E %18.9E\n', ...
+                mesh.vertices(k, vertexIndex, 1), mesh.vertices(k, vertexIndex, 2), mesh.vertices(k, vertexIndex, 3));
         end
     end
     fclose(fid);
 
-    fprintf('>>> BMF mesh exported successfully: %s (NPAN=%d, Type=%d)\n', filename, mesh.n_panels, main_type);
+    fprintf('[OK] BMF mesh exported: %s (NPAN=%d, Type=%d)\n', filename, mesh.n_panels, main_type);
 end

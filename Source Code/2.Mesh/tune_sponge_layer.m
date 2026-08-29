@@ -5,7 +5,8 @@ function [cfg, report] = tune_sponge_layer(cfg, omegas)
 %   [cfg, report] = tune_sponge_layer(cfg, omegas)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   cfg                - [struct] Validated CRESTU configuration containing SI-valued physical and numerical parameters.
@@ -23,9 +24,10 @@ function [cfg, report] = tune_sponge_layer(cfg, omegas)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    omegas = reshape(omegas, 1, []); wavelength = zeros(size(omegas));
+    omegas = reshape(omegas, 1, []);
+    wavelength = zeros(size(omegas));
     for k = 1:numel(omegas)
         wave_number = local_dispersion(omegas(k), cfg.grav, cfg.water_depth);
         wavelength(k) = 2 * pi / wave_number;
@@ -34,18 +36,18 @@ function [cfg, report] = tune_sponge_layer(cfg, omegas)
     required_width = 1.5 * max(wavelength);
     cfg.fs.r_outer = max(cfg.fs.r_outer, cfg.fs.r_inner + required_width);
     width = cfg.fs.r_outer - cfg.fs.r_inner;
-    % Quadratic profile: integral(mu dr)=mu0*width/3.  The following
-    % coefficient targets exp(-4) attenuation over the sponge.
+% Quadratic profile: integral(mu dr)=mu0*width/3.  The following
+% coefficient targets exp(-4) attenuation over the sponge.
     dynamic_mu0 = zeros(size(omegas));
     for k = 1:numel(omegas)
         wave_number = 2 * pi / wavelength(k);
         dynamic_mu0(k) = min(2.5, max(cfg.fs.mu0, 12 / (wave_number * width)));
     end
-    report = struct('wavelengths', wavelength, 'required_width', required_width, ...
-        'original_outer_radius', original_outer, 'outer_radius', cfg.fs.r_outer, ...
-        'width', width, 'dynamic_mu0', dynamic_mu0, 'target_attenuation', exp(-4));
+    report = struct('wavelengths', wavelength,'required_width', required_width, ...
+'original_outer_radius', original_outer,'outer_radius', cfg.fs.r_outer, ...
+'width', width,'dynamic_mu0', dynamic_mu0,'target_attenuation', exp(-4));
     if cfg.fs.r_outer > original_outer * (1 + 1e-12)
-        fprintf('>>> Sponge radius expanded: Rout %.3g -> %.3g m (width %.3g m >= 1.5 lambda_max).\n', ...
+        fprintf('[WARN] Sponge radius expanded: Rout %.3g -> %.3g m (width %.3g m >= 1.5 lambda_max).\n', ...
             original_outer, cfg.fs.r_outer, width);
     end
 end
@@ -57,7 +59,8 @@ function k = local_dispersion(omega, g, depth)
 %   k = local_dispersion(omega, g, depth)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   omega              - [scalar] Angular frequency, [rad/s].
@@ -75,14 +78,22 @@ function k = local_dispersion(omega, g, depth)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if depth <= 0, k = omega^2 / g; return; end
+    if depth <= 0
+        k = omega^2 / g;
+        return;
+    end
     k = max(omega^2 / g, omega / sqrt(g * depth));
     for iteration = 1:50
-        kh = k * depth; th = tanh(kh); residual = g * k * th - omega^2;
-        derivative = g * (th + kh / (cosh(kh)^2)); update = residual / derivative;
+        kh = k * depth;
+        th = tanh(kh);
+        residual = g * k * th - omega^2;
+        derivative = g * (th + kh / (cosh(kh)^2));
+        update = residual / derivative;
         k = max(k - update, eps);
-        if abs(update) < 1e-13 * max(1, k), break; end
+        if abs(update) < 1e-13 * max(1, k)
+            break;
+        end
     end
 end

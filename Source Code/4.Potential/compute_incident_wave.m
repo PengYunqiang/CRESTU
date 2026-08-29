@@ -5,7 +5,8 @@ function [phi_I, dphi_I_dn, k] = compute_incident_wave(centers, normals, omega, 
 %   [phi_I, dphi_I_dn, k] = compute_incident_wave(centers, normals, omega, g, depth, beta_deg, amplitude)
 %
 % Description:
-%   The routine implements a component of the linear Rankine boundary-element formulation for incompressible, irrotational gravity-wave flow. Geometry, reflection parity, free-surface impedance, and complex phase follow the project convention exp(i*omega*t).
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
 %   centers            - [N x 3] Panel collocation points in global coordinates, [m].
@@ -29,23 +30,31 @@ function [phi_I, dphi_I_dn, k] = compute_incident_wave(centers, normals, omega, 
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if nargin < 7 || isempty(amplitude), amplitude = 1; end
-    centers = reshape(centers, [], 3); normals = reshape(normals, [], 3);
-    if size(centers, 1) ~= size(normals, 1), error('CRESTU:IncidentShape', 'Centers/normals row mismatch.'); end
-    validateattributes(omega, {'numeric'}, {'scalar', 'real', 'positive', 'finite'});
-    k = solve_dispersion(omega, g, depth); beta = beta_deg * pi / 180;
+    if nargin < 7 || isempty(amplitude)
+        amplitude = 1;
+    end
+    centers = reshape(centers, [], 3);
+    normals = reshape(normals, [], 3);
+    if size(centers, 1) ~= size(normals, 1)
+        error('CRESTU:IncidentShape','Centers/normals row mismatch.');
+    end
+    validateattributes(omega, {'numeric'}, {'scalar','real','positive','finite'});
+    k = solve_dispersion(omega, g, depth);
+    beta = beta_deg * pi / 180;
     phase = exp(-1i * k * (centers(:, 1) * cos(beta) + centers(:, 2) * sin(beta)));
     coefficient = 1i * g * amplitude / omega;
     if depth > 0
         vertical = cosh(k * (centers(:, 3) + depth)) / cosh(k * depth);
         vertical_dz = k * sinh(k * (centers(:, 3) + depth)) / cosh(k * depth);
     else
-        vertical = exp(k * centers(:, 3)); vertical_dz = k * vertical;
+        vertical = exp(k * centers(:, 3));
+        vertical_dz = k * vertical;
     end
     phi_I = coefficient * vertical .* phase;
-    u = (-1i * k * cos(beta)) * phi_I; v = (-1i * k * sin(beta)) * phi_I;
+    u = (-1i * k * cos(beta)) * phi_I;
+    v = (-1i * k * sin(beta)) * phi_I;
     w = coefficient * vertical_dz .* phase;
     dphi_I_dn = u .* normals(:, 1) + v .* normals(:, 2) + w .* normals(:, 3);
 end
@@ -57,7 +66,8 @@ function k = solve_dispersion(omega, g, depth)
 %   k = solve_dispersion(omega, g, depth)
 %
 % Description:
-%   The routine implements a component of the linear Rankine boundary-element formulation for incompressible, irrotational gravity-wave flow. Geometry, reflection parity, free-surface impedance, and complex phase follow the project convention exp(i*omega*t).
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
 %   omega              - [scalar] Angular frequency, [rad/s].
@@ -75,16 +85,25 @@ function k = solve_dispersion(omega, g, depth)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     k = omega^2 / g;
-    if depth <= 0, return; end
+    if depth <= 0
+        return;
+    end
     k = max(k, omega / sqrt(g * depth));
     for iter = 1:50
-        kh = k * depth; t = tanh(kh); f = g * k * t - omega^2;
-        df = g * t + g * k * depth / (cosh(kh)^2); step = f / df; k_new = max(k - step, eps);
-        if abs(k_new - k) <= 1e-12 * max(1, k), k = k_new; return; end
+        kh = k * depth;
+        t = tanh(kh);
+        dispersionResidual = g * k * t - omega^2;
+        df = g * t + g * k * depth / (cosh(kh)^2);
+        step = dispersionResidual / df;
+        k_new = max(k - step, eps);
+        if abs(k_new - k) <= 1e-12 * max(1, k)
+            k = k_new;
+            return;
+        end
         k = k_new;
     end
-    warning('CRESTU:DispersionConvergence', 'Dispersion iteration reached its limit at omega=%g.', omega);
+    warning('CRESTU:DispersionConvergence','Dispersion iteration reached its limit at omega=%g.', omega);
 end

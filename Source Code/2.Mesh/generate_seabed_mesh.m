@@ -5,7 +5,8 @@ function mesh_seabed = generate_seabed_mesh(waterline, cfg, mesh_fs)
 %   mesh_seabed = generate_seabed_mesh(waterline, cfg, mesh_fs)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   waterline          - [struct] Ordered waterline nodes and segment metadata, with coordinates in [m].
@@ -23,28 +24,30 @@ function mesh_seabed = generate_seabed_mesh(waterline, cfg, mesh_fs)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    h = cfg.water_depth;
-    if h <= 0, error('A seabed mesh is not required for an infinite-depth configuration'); end
+    waterDepth = cfg.water_depth;
+    if waterDepth <= 0
+        error('A seabed mesh is not required for an infinite-depth configuration');
+    end
 
     if nargin < 3 || isempty(mesh_fs)
         mesh_fs = generate_free_surface_bmf('', waterline, cfg);
     end
 
-    % =====================================================================
-    % =====================================================================
+% =====================================================================
+% =====================================================================
     n_ring_panels = mesh_fs.n_panels;
     v_ring = mesh_fs.vertices;
-    v_ring(:, :, 3) = -h;
+    v_ring(:, :, 3) = -waterDepth;
     c_ring = mesh_fs.centers;
-    c_ring(:, 3) = -h;
+    c_ring(:, 3) = -waterDepth;
     a_ring = mesh_fs.areas;
     e1_ring = mesh_fs.e1;
     e2_ring = mesh_fs.e2;
 
-    % =====================================================================
-    % =====================================================================
+% =====================================================================
+% =====================================================================
     wl_nodes = waterline.nodes;
     n_pts = size(wl_nodes, 1);
     wl_closed = [wl_nodes; wl_nodes(1, :)];
@@ -64,7 +67,7 @@ function mesh_seabed = generate_seabed_mesh(waterline, cfg, mesh_fs)
         turn_angles(i) = acos(cos_th);
     end
 
-    [sorted_angles, sort_idx] = sort(turn_angles, 'descend');
+    [sorted_angles, sort_idx] = sort(turn_angles,'descend');
 
     if sorted_angles(4) > deg2rad(30)
         c_idx = sort(sort_idx(1:4));
@@ -91,61 +94,65 @@ function mesh_seabed = generate_seabed_mesh(waterline, cfg, mesh_fs)
     seg3_pts = extract_resample_segment(wl_nodes, c_idx(3), c_idx(4), Nx + 1);
     seg4_pts = extract_resample_segment(wl_nodes, c_idx(4), c_idx(1), Ny + 1);
 
-    % =====================================================================
-    % =====================================================================
+% =====================================================================
+% =====================================================================
     C1 = seg1_pts(1, :);
     C2 = seg2_pts(1, :);
     C3 = seg3_pts(1, :);
     C4 = seg4_pts(1, :);
 
-    O = [xc, yc];
+    diskCenter = [xc, yc];
     alpha = 0.5;
 
-    K1 = O + alpha * (C1 - O);
-    K2 = O + alpha * (C2 - O);
-    K3 = O + alpha * (C3 - O);
-    K4 = O + alpha * (C4 - O);
+    K1 = diskCenter + alpha * (C1 - diskCenter);
+    K2 = diskCenter + alpha * (C2 - diskCenter);
+    K3 = diskCenter + alpha * (C3 - diskCenter);
+    K4 = diskCenter + alpha * (C4 - diskCenter);
 
     edge1 = [linspace(K1(1), K2(1), Nx + 1)', linspace(K1(2), K2(2), Nx + 1)'];
     edge2 = [linspace(K2(1), K3(1), Ny + 1)', linspace(K2(2), K3(2), Ny + 1)'];
     edge3 = [linspace(K3(1), K4(1), Nx + 1)', linspace(K3(2), K4(2), Nx + 1)'];
     edge4 = [linspace(K4(1), K1(1), Ny + 1)', linspace(K4(2), K1(2), Ny + 1)'];
 
-    % =====================================================================
-    % =====================================================================
+% =====================================================================
+% =====================================================================
     Nr = max(3, round((Nx + Ny) * 0.25));
-    w = linspace(0.0, 1.0, Nr + 1);
+    radialBlend = linspace(0.0, 1.0, Nr + 1);
 
-    % Block 1
-    G1_x = zeros(Nx + 1, Nr + 1); G1_y = zeros(Nx + 1, Nr + 1);
+% Block 1
+    G1_x = zeros(Nx + 1, Nr + 1);
+    G1_y = zeros(Nx + 1, Nr + 1);
     for k = 1:Nr + 1
-        G1_x(:, k) = (1 - w(k)) * seg1_pts(:, 1) + w(k) * edge1(:, 1);
-        G1_y(:, k) = (1 - w(k)) * seg1_pts(:, 2) + w(k) * edge1(:, 2);
+        G1_x(:, k) = (1 - radialBlend(k)) * seg1_pts(:, 1) + radialBlend(k) * edge1(:, 1);
+        G1_y(:, k) = (1 - radialBlend(k)) * seg1_pts(:, 2) + radialBlend(k) * edge1(:, 2);
     end
 
-    % Block 2
-    G2_x = zeros(Ny + 1, Nr + 1); G2_y = zeros(Ny + 1, Nr + 1);
+% Block 2
+    G2_x = zeros(Ny + 1, Nr + 1);
+    G2_y = zeros(Ny + 1, Nr + 1);
     for k = 1:Nr + 1
-        G2_x(:, k) = (1 - w(k)) * seg2_pts(:, 1) + w(k) * edge2(:, 1);
-        G2_y(:, k) = (1 - w(k)) * seg2_pts(:, 2) + w(k) * edge2(:, 2);
+        G2_x(:, k) = (1 - radialBlend(k)) * seg2_pts(:, 1) + radialBlend(k) * edge2(:, 1);
+        G2_y(:, k) = (1 - radialBlend(k)) * seg2_pts(:, 2) + radialBlend(k) * edge2(:, 2);
     end
 
-    % Block 3
-    G3_x = zeros(Nx + 1, Nr + 1); G3_y = zeros(Nx + 1, Nr + 1);
+% Block 3
+    G3_x = zeros(Nx + 1, Nr + 1);
+    G3_y = zeros(Nx + 1, Nr + 1);
     for k = 1:Nr + 1
-        G3_x(:, k) = (1 - w(k)) * seg3_pts(:, 1) + w(k) * edge3(:, 1);
-        G3_y(:, k) = (1 - w(k)) * seg3_pts(:, 2) + w(k) * edge3(:, 2);
+        G3_x(:, k) = (1 - radialBlend(k)) * seg3_pts(:, 1) + radialBlend(k) * edge3(:, 1);
+        G3_y(:, k) = (1 - radialBlend(k)) * seg3_pts(:, 2) + radialBlend(k) * edge3(:, 2);
     end
 
-    % Block 4
-    G4_x = zeros(Ny + 1, Nr + 1); G4_y = zeros(Ny + 1, Nr + 1);
+% Block 4
+    G4_x = zeros(Ny + 1, Nr + 1);
+    G4_y = zeros(Ny + 1, Nr + 1);
     for k = 1:Nr + 1
-        G4_x(:, k) = (1 - w(k)) * seg4_pts(:, 1) + w(k) * edge4(:, 1);
-        G4_y(:, k) = (1 - w(k)) * seg4_pts(:, 2) + w(k) * edge4(:, 2);
+        G4_x(:, k) = (1 - radialBlend(k)) * seg4_pts(:, 1) + radialBlend(k) * edge4(:, 1);
+        G4_y(:, k) = (1 - radialBlend(k)) * seg4_pts(:, 2) + radialBlend(k) * edge4(:, 2);
     end
 
-    % =====================================================================
-    % =====================================================================
+% =====================================================================
+% =====================================================================
     u_lin = linspace(0.0, 1.0, Nx + 1);
     v_lin = linspace(0.0, 1.0, Ny + 1);
     [U, V] = ndgrid(u_lin, v_lin);
@@ -155,21 +162,26 @@ function mesh_seabed = generate_seabed_mesh(waterline, cfg, mesh_fs)
     G0_y = (1 - U) .* (1 - V) * K1(2) + U .* (1 - V) * K2(2) + ...
             U .* V * K3(2) + (1 - U) .* V * K4(2);
 
-    % =====================================================================
-    % =====================================================================
-    G0_x = smooth_internal_grid(G0_x); G0_y = smooth_internal_grid(G0_y);
-    G1_x = smooth_internal_grid(G1_x); G1_y = smooth_internal_grid(G1_y);
-    G2_x = smooth_internal_grid(G2_x); G2_y = smooth_internal_grid(G2_y);
-    G3_x = smooth_internal_grid(G3_x); G3_y = smooth_internal_grid(G3_y);
-    G4_x = smooth_internal_grid(G4_x); G4_y = smooth_internal_grid(G4_y);
+% =====================================================================
+% =====================================================================
+    G0_x = smooth_internal_grid(G0_x);
+    G0_y = smooth_internal_grid(G0_y);
+    G1_x = smooth_internal_grid(G1_x);
+    G1_y = smooth_internal_grid(G1_y);
+    G2_x = smooth_internal_grid(G2_x);
+    G2_y = smooth_internal_grid(G2_y);
+    G3_x = smooth_internal_grid(G3_x);
+    G3_y = smooth_internal_grid(G3_y);
+    G4_x = smooth_internal_grid(G4_x);
+    G4_y = smooth_internal_grid(G4_y);
 
-    % =====================================================================
-    % =====================================================================
-    [v1, c1, a1, e1_1, e2_1] = grid_to_panels(G1_x, G1_y, -h);
-    [v2, c2, a2, e1_2, e2_2] = grid_to_panels(G2_x, G2_y, -h);
-    [v3, c3, a3, e1_3, e2_3] = grid_to_panels(G3_x, G3_y, -h);
-    [v4, c4, a4, e1_4, e2_4] = grid_to_panels(G4_x, G4_y, -h);
-    [v0, c0, a0, e1_0, e2_0] = grid_to_panels(G0_x, G0_y, -h);
+% =====================================================================
+% =====================================================================
+    [v1, c1, a1, e1_1, e2_1] = grid_to_panels(G1_x, G1_y, -waterDepth);
+    [v2, c2, a2, e1_2, e2_2] = grid_to_panels(G2_x, G2_y, -waterDepth);
+    [v3, c3, a3, e1_3, e2_3] = grid_to_panels(G3_x, G3_y, -waterDepth);
+    [v4, c4, a4, e1_4, e2_4] = grid_to_panels(G4_x, G4_y, -waterDepth);
+    [v0, c0, a0, e1_0, e2_0] = grid_to_panels(G0_x, G0_y, -waterDepth);
 
     v_infill = cat(1, v1, v2, v3, v4, v0);
     c_infill = cat(1, c1, c2, c3, c4, c0);
@@ -186,7 +198,7 @@ function mesh_seabed = generate_seabed_mesh(waterline, cfg, mesh_fs)
     normals = repmat([0.0, 0.0, 1.0], [total_panels, 1]);
 
     mesh_seabed.header = sprintf('Adaptive 5-Block Seabed (Depth=%.2fm, NP=%d, Nx=%d, Ny=%d)', ...
-                                      h, total_panels, Nx, Ny);
+                                      waterDepth, total_panels, Nx, Ny);
     mesh_seabed.ulen = 1.0;
     mesh_seabed.panel_type = repmat(4, [total_panels, 1]);
     mesh_seabed.isx = cfg.isx;
@@ -198,7 +210,7 @@ function mesh_seabed = generate_seabed_mesh(waterline, cfg, mesh_fs)
     mesh_seabed.areas = areas;
     mesh_seabed.e1 = e1;
     mesh_seabed.e2 = e2;
-    mesh_seabed.hydrostatics = struct('Vx', 0, 'Vy', 0, 'Vz', 0, 'V_mean', 0, 'center_of_buoyancy', [0, 0, 0]);
+    mesh_seabed.hydrostatics = struct('Vx', 0,'Vy', 0,'Vz', 0,'V_mean', 0,'center_of_buoyancy', [0, 0, 0]);
 end
 
 % -------------------------------------------------------------------------
@@ -210,7 +222,8 @@ function pts_out = extract_resample_segment(wl_nodes, idx_start, idx_end, n_targ
 %   pts_out = extract_resample_segment(wl_nodes, idx_start, idx_end, n_target)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   wl_nodes           - [N x 2] Ordered waterline nodes, [m].
@@ -229,7 +242,7 @@ function pts_out = extract_resample_segment(wl_nodes, idx_start, idx_end, n_targ
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     n_pts = size(wl_nodes, 1);
 
@@ -250,8 +263,8 @@ function pts_out = extract_resample_segment(wl_nodes, idx_start, idx_end, n_targ
     end
 
     s_target = linspace(0, total_len, n_target);
-    pts_out = [interp1(cum_s, raw_pts(:, 1), s_target, 'linear')', ...
-               interp1(cum_s, raw_pts(:, 2), s_target, 'linear')'];
+    pts_out = [interp1(cum_s, raw_pts(:, 1), s_target,'linear')', ...
+               interp1(cum_s, raw_pts(:, 2), s_target,'linear')'];
 end
 
 % -------------------------------------------------------------------------
@@ -263,7 +276,8 @@ function G = smooth_internal_grid(G)
 %   G = smooth_internal_grid(G)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   G                  - [M x N x 2] Smoothed structured planar grid coordinates, [m].
@@ -279,10 +293,12 @@ function G = smooth_internal_grid(G)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     [Ni, Nj] = size(G);
-    if Ni <= 2 || Nj <= 2, return; end
+    if Ni <= 2 || Nj <= 2
+        return;
+    end
     for iter = 1:25
         for i = 2:Ni - 1
             for j = 2:Nj - 1
@@ -301,7 +317,8 @@ function [vertices, centers, areas, e1, e2] = grid_to_panels(Gx, Gy, z_val)
 %   [vertices, centers, areas, e1, e2] = grid_to_panels(Gx, Gy, z_val)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   Gx                 - [M x N] Structured-grid x coordinates, [m].
@@ -323,7 +340,7 @@ function [vertices, centers, areas, e1, e2] = grid_to_panels(Gx, Gy, z_val)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     [Ni, Nj] = size(Gx);
     n_panels = (Ni - 1) * (Nj - 1);
@@ -350,7 +367,8 @@ function [vertices, centers, areas, e1, e2] = grid_to_panels(Gx, Gy, z_val)
             vertices(p_idx, 4, :) = p4;
 
             centers(p_idx, :) = (p1 + p2 + p3 + p4) / 4.0;
-            d13 = p3 - p1; d24 = p4 - p2;
+            d13 = p3 - p1;
+            d24 = p4 - p2;
             areas(p_idx) = 0.5 * norm(cross(d13, d24));
 
             e1(p_idx, :) = [1.0, 0.0, 0.0];

@@ -1,17 +1,18 @@
-function mass_matrix = assemble_mass_matrix(mass_props)
+function massMatrix = assemble_mass_matrix(mass_props)
 % ASSEMBLE_MASS_MATRIX Assemble the global rigid-body mass and inertia matrix.
 %
 % Syntax:
-%   mass_matrix = assemble_mass_matrix(mass_props)
+%   massMatrix = assemble_mass_matrix(mass_props)
 %
 % Description:
-%   The routine converts first-order potential-flow or rigid-body data into generalized hydrodynamic coefficients, loads, restoring terms, or motions. Translational and rotational quantities retain the global 6-DOF ordering used by CRESTU.
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
 %   mass_props         - [struct array] Body masses, centers of gravity, and inertia tensors in SI units.
 %
 % Outputs:
-%   mass_matrix        - [6Nb x 6Nb] Global rigid-body mass and inertia matrix, [kg], [kg m], and [kg m^2].
+%   massMatrix         - [6Nb x 6Nb] Global rigid-body mass and inertia matrix, [kg], [kg m], and [kg m^2].
 %
 % Governing Equations / Theory:
 %   Linear unsteady Bernoulli pressure, generalized surface integration, hydrostatics, radiation energy, or the frequency-domain rigid-body equation as applicable.
@@ -21,14 +22,30 @@ function mass_matrix = assemble_mass_matrix(mass_props)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    n = numel(mass_props); mass_matrix = zeros(6 * n);
-    for b = 1:n
-        idx = (b - 1) * 6 + (1:6); m = mass_props(b).mass; inertia = mass_props(b).inertia;
-        if ~isequal(size(inertia), [3, 3]) || m <= 0 || any(eig((inertia + inertia.') / 2) <= 0)
-            error('CRESTU:MassProperties', 'Invalid mass properties for body %d.', b);
+    bodyCount = numel(mass_props);
+    assert(bodyCount > 0, 'CRESTU:MassProperties', ...
+        'At least one body mass-property record is required.');
+
+    %% Stage 2: Assemble body mass and inertia blocks
+
+    % A five-module model has 30 global DOFs. Module m uses
+    % 6*(m-1)+(1:6). Local DOF 1-6: Surge, Sway, Heave, Roll, Pitch, Yaw.
+    massMatrix = zeros(6 * bodyCount);
+
+    for bodyIndex = 1:bodyCount
+        globalDofRows = 6 * (bodyIndex - 1) + (1:6);
+        bodyMass = mass_props(bodyIndex).mass; % [kg]
+        bodyInertia = mass_props(bodyIndex).inertia; % [kg*m^2]
+
+        if ~isequal(size(bodyInertia), [3, 3]) || bodyMass <= 0 || ...
+                any(eig((bodyInertia + bodyInertia.') / 2) <= 0)
+            error('CRESTU:MassProperties', ...
+                'Invalid mass properties for body %d.', bodyIndex);
         end
-        mass_matrix(idx, idx) = blkdiag(m * eye(3), (inertia + inertia.') / 2);
+
+        massMatrix(globalDofRows, globalDofRows) = ...
+            blkdiag(bodyMass * eye(3), (bodyInertia + bodyInertia.') / 2);
     end
 end

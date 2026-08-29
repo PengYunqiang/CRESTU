@@ -5,7 +5,8 @@ function reference = read_wamit_excitation(filename, rho, g, wave_amplitude, cha
 %   reference = read_wamit_excitation(filename, rho, g, wave_amplitude, characteristic_length)
 %
 % Description:
-%   The routine converts first-order potential-flow or rigid-body data into generalized hydrodynamic coefficients, loads, restoring terms, or motions. Translational and rotational quantities retain the global 6-DOF ordering used by CRESTU.
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
 %   filename           - [character vector or string scalar] Input or output file path.
@@ -25,21 +26,33 @@ function reference = read_wamit_excitation(filename, rho, g, wave_amplitude, cha
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if nargin < 4 || isempty(wave_amplitude), wave_amplitude = 1; end
-    if nargin < 5 || isempty(characteristic_length), characteristic_length = 1; end
-    raw = readmatrix(filename, 'FileType', 'text');
-    if size(raw, 2) < 7, error('CRESTU:WamitFormat', 'Expected seven columns in %s.', filename); end
-    periods = unique(raw(:, 1), 'stable'); headings = unique(raw(:, 2), 'stable');
-    nf = numel(periods); nh = numel(headings); ndof = max(raw(:, 3));
-    value = complex(zeros(ndof, nh, nf)); coefficient = complex(zeros(ndof, nh, nf));
-    for r = 1:size(raw, 1)
-        k = find(periods == raw(r, 1), 1); h = find(headings == raw(r, 2), 1); mode = raw(r, 3);
-        coefficient(mode, h, k) = complex(raw(r, 6), raw(r, 7));
-        scale = rho * g * wave_amplitude * characteristic_length^(2 + (mode > 3));
-        value(mode, h, k) = scale * coefficient(mode, h, k);
+    if nargin < 4 || isempty(wave_amplitude)
+        wave_amplitude = 1;
     end
-    reference = struct('file', filename, 'periods', periods(:).', 'omegas', 2 * pi ./ periods(:).', ...
-        'headings', headings(:).', 'coefficient', coefficient, 'force', value);
+    if nargin < 5 || isempty(characteristic_length)
+        characteristic_length = 1;
+    end
+    raw = readmatrix(filename,'FileType','text');
+    if size(raw, 2) < 7
+        error('CRESTU:WamitFormat','Expected seven columns in %s.', filename);
+    end
+    periods = unique(raw(:, 1),'stable');
+    headings = unique(raw(:, 2),'stable');
+    nf = numel(periods);
+    nh = numel(headings);
+    ndof = max(raw(:, 3));
+    value = complex(zeros(ndof, nh, nf));
+    coefficient = complex(zeros(ndof, nh, nf));
+    for rowIndex = 1:size(raw, 1)
+        k = find(periods == raw(rowIndex, 1), 1);
+        headingIndex = find(headings == raw(rowIndex, 2), 1);
+        mode = raw(rowIndex, 3);
+        coefficient(mode, headingIndex, k) = complex(raw(rowIndex, 6), raw(rowIndex, 7));
+        scale = rho * g * wave_amplitude * characteristic_length^(2 + (mode > 3));
+        value(mode, headingIndex, k) = scale * coefficient(mode, headingIndex, k);
+    end
+    reference = struct('file', filename,'periods', periods(:).','omegas', 2 * pi ./ periods(:).', ...
+'headings', headings(:).','coefficient', coefficient,'force', value);
 end

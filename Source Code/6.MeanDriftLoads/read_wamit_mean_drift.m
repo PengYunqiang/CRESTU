@@ -5,7 +5,8 @@ function reference = read_wamit_mean_drift(filename, rho, g, wave_amplitude, wam
 %   reference = read_wamit_mean_drift(filename, rho, g, wave_amplitude, wamit_length, output_length)
 %
 % Description:
-%   The routine evaluates, reconstructs, imports, or exports quantities required by second-order mean wave-drift analysis. Complex products are time averaged consistently with the exp(i*omega*t) convention and generalized loads use the project 6-DOF ordering.
+%   Computes or processes second-order mean wave-drift quantities.
+%   Complex averages follow exp(i*omega*t) and the 6-DOF order.
 %
 % Inputs:
 %   filename           - [character vector or string scalar] Input or output file path.
@@ -26,7 +27,7 @@ function reference = read_wamit_mean_drift(filename, rho, g, wave_amplitude, wam
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     if nargin < 4 || isempty(wave_amplitude)
         wave_amplitude = 1;
@@ -38,13 +39,13 @@ function reference = read_wamit_mean_drift(filename, rho, g, wave_amplitude, wam
         output_length = wamit_length;
     end
 
-    raw = readmatrix(filename, 'FileType', 'text');
+    raw = readmatrix(filename,'FileType','text');
     if size(raw, 2) < 8
-        error('CRESTU:WamitFormat', 'Expected eight columns in %s.', filename);
+        error('CRESTU:WamitFormat','Expected eight columns in %s.', filename);
     end
     raw = raw(raw(:, 2) == raw(:, 3) & raw(:, 4) > 0 & raw(:, 4) <= 6, :);
-    periods = unique(raw(:, 1), 'stable');
-    headings = unique(raw(:, 2), 'stable');
+    periods = unique(raw(:, 1),'stable');
+    headings = unique(raw(:, 2),'stable');
     frequency_count = numel(periods);
     heading_count = numel(headings);
     coefficient = zeros(6, heading_count, frequency_count);
@@ -64,19 +65,19 @@ function reference = read_wamit_mean_drift(filename, rho, g, wave_amplitude, wam
     end
 
     [~, ~, extension] = fileparts(filename);
-    method = 'direct_pressure';
-    if strcmpi(extension, '.8')
-        method = 'momentum';
+    method ='direct_pressure';
+    if strcmpi(extension,'.8')
+        method ='momentum';
     end
     reference = struct( ...
-        'file', filename, ...
-        'method', method, ...
-        'periods', periods(:).', ...
-        'omegas', 2 * pi ./ periods(:).', ...
-        'headings', headings(:).', ...
-        'wamit_coefficient', coefficient, ...
-        'Cd', cd, ...
-        'load', load_value, ...
-        'wamit_length', wamit_length, ...
-        'output_length', output_length);
+'file', filename, ...
+'method', method, ...
+'periods', periods(:).', ...
+'omegas', 2 * pi ./ periods(:).', ...
+'headings', headings(:).', ...
+'wamit_coefficient', coefficient, ...
+'Cd', cd, ...
+'load', load_value, ...
+'wamit_length', wamit_length, ...
+'output_length', output_length);
 end

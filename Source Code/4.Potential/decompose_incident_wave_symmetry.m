@@ -6,7 +6,8 @@ function [phi_component, dphi_component] = decompose_incident_wave_symmetry( ...
 %   [phi_component, dphi_component] = decompose_incident_wave_symmetry(centers, normals, omega, g, depth, beta_deg, amplitude, isx, isy, parity)
 %
 % Description:
-%   The routine implements a component of the linear Rankine boundary-element formulation for incompressible, irrotational gravity-wave flow. Geometry, reflection parity, free-surface impedance, and complex phase follow the project convention exp(i*omega*t).
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
 %   centers            - [N x 3] Panel collocation points in global coordinates, [m].
@@ -32,14 +33,20 @@ function [phi_component, dphi_component] = decompose_incident_wave_symmetry( ...
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    flags = [0, 0]; headings = beta_deg; weights = 1;
+    flags = [0, 0];
+    headings = beta_deg;
+    weights = 1;
     if isx
-        flags = [flags;1, 0]; headings = [headings, 180 - beta_deg]; weights = [weights, parity(1)];
+        flags = [flags;1, 0];
+        headings = [headings, 180 - beta_deg];
+        weights = [weights, parity(1)];
     end
     if isy
-        flags = [flags;0, 1]; headings = [headings, -beta_deg]; weights = [weights, parity(2)];
+        flags = [flags;0, 1];
+        headings = [headings, -beta_deg];
+        weights = [weights, parity(2)];
     end
     if isx && isy
         flags = [0, 0;1, 0;0, 1;1, 1];
@@ -48,10 +55,12 @@ function [phi_component, dphi_component] = decompose_incident_wave_symmetry( ...
     end
     phi_component = complex(zeros(size(centers, 1), 1));
     dphi_component = complex(zeros(size(centers, 1), 1));
-    for q = 1:size(flags, 1)
-        [phi, dphi] = compute_incident_wave(centers, normals, omega, g, depth, headings(q), amplitude);
-        phi_component = phi_component + weights(q) * phi;
-        dphi_component = dphi_component + weights(q) * dphi;
+    for componentIndex = 1:size(flags, 1)
+        [phi, dphi] = compute_incident_wave(centers, normals, omega, g, depth, headings(componentIndex), amplitude);
+        phi_component = phi_component + weights(componentIndex) * phi;
+        dphi_component = dphi_component + weights(componentIndex) * dphi;
     end
-    scale = 2^(isx + isy); phi_component = phi_component / scale; dphi_component = dphi_component / scale;
+    scale = 2^(isx + isy);
+    phi_component = phi_component / scale;
+    dphi_component = dphi_component / scale;
 end

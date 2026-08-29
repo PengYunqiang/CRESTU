@@ -5,7 +5,8 @@ function reference = read_wamit_first_order(file_one, rho)
 %   reference = read_wamit_first_order(file_one, rho)
 %
 % Description:
-%   The routine converts first-order potential-flow or rigid-body data into generalized hydrodynamic coefficients, loads, restoring terms, or motions. Translational and rotational quantities retain the global 6-DOF ordering used by CRESTU.
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
 %   file_one           - [character vector or string scalar] WAMIT first-order output-file path.
@@ -22,16 +23,25 @@ function reference = read_wamit_first_order(file_one, rho)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    raw = readmatrix(file_one, 'FileType', 'text');
-    if size(raw, 2) < 5, error('CRESTU:WamitFormat', 'Expected five columns in %s.', file_one); end
-    periods = unique(raw(:, 1), 'stable'); nf = numel(periods); ndof = max(max(raw(:, 2:3)));
-    A = zeros(ndof, ndof, nf); B = zeros(ndof, ndof, nf); omegas = 2 * pi ./ periods(:).';
-    for r = 1:size(raw, 1)
-        k = find(periods == raw(r, 1), 1); i = raw(r, 2); j = raw(r, 3);
-        A(i, j, k) = rho * raw(r, 4); B(i, j, k) = rho * omegas(k) * raw(r, 5);
+    raw = readmatrix(file_one,'FileType','text');
+    if size(raw, 2) < 5
+        error('CRESTU:WamitFormat','Expected five columns in %s.', file_one);
     end
-    reference = struct('file', file_one, 'periods', periods(:).', 'omegas', omegas, ...
-        'added_mass', A, 'damping', B, 'rho', rho);
+    periods = unique(raw(:, 1),'stable');
+    nf = numel(periods);
+    ndof = max(max(raw(:, 2:3)));
+    A = zeros(ndof, ndof, nf);
+    B = zeros(ndof, ndof, nf);
+    omegas = 2 * pi ./ periods(:).';
+    for rowIndex = 1:size(raw, 1)
+        k = find(periods == raw(rowIndex, 1), 1);
+        i = raw(rowIndex, 2);
+        j = raw(rowIndex, 3);
+        A(i, j, k) = rho * raw(rowIndex, 4);
+        B(i, j, k) = rho * omegas(k) * raw(rowIndex, 5);
+    end
+    reference = struct('file', file_one,'periods', periods(:).','omegas', omegas, ...
+'added_mass', A,'damping', B,'rho', rho);
 end

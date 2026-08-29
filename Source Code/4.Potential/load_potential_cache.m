@@ -5,7 +5,8 @@ function pot_cache = load_potential_cache(cache_file, cfg, geometry)
 %   pot_cache = load_potential_cache(cache_file, cfg, geometry)
 %
 % Description:
-%   The routine implements a component of the linear Rankine boundary-element formulation for incompressible, irrotational gravity-wave flow. Geometry, reflection parity, free-surface impedance, and complex phase follow the project convention exp(i*omega*t).
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
 %   cache_file         - [character vector or string scalar] Potential-cache file path.
@@ -23,16 +24,22 @@ function pot_cache = load_potential_cache(cache_file, cfg, geometry)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if ~exist(cache_file, 'file'), error('CRESTU:CacheMissing', 'Potential cache not found: %s', cache_file); end
-    data = load(cache_file, 'pot_cache');
-    if ~isfield(data, 'pot_cache'), error('CRESTU:CacheVariable', 'Cache lacks pot_cache variable: %s', cache_file); end
+    if ~exist(cache_file,'file')
+        error('CRESTU:CacheMissing','Potential cache not found: %s', cache_file);
+    end
+    data = load(cache_file,'pot_cache');
+    if ~isfield(data,'pot_cache')
+        error('CRESTU:CacheVariable','Cache lacks pot_cache variable: %s', cache_file);
+    end
     pot_cache = data.pot_cache;
-    required = {'schema_version', 'case_name', 'omegas', 'headings', 'n_body_panels', ...
-        'n_total_panels', 'environment', 'geometry_signature', 'entries'};
+    required = {'schema_version','case_name','omegas','headings','n_body_panels', ...
+'n_total_panels','environment','geometry_signature','entries'};
     for k = 1:numel(required)
-        if ~isfield(pot_cache, required{k}), error('CRESTU:CacheSchema', 'Cache lacks %s.', required{k}); end
+        if ~isfield(pot_cache, required{k})
+            error('CRESTU:CacheSchema','Cache lacks %s.', required{k});
+        end
     end
     active_environment = [cfg.water_depth, cfg.grav, cfg.rho, cfg.fs.r_inner, cfg.fs.r_outer, ...
         cfg.fs.mu0, cfg.isx, cfg.isy];
@@ -43,7 +50,7 @@ function pot_cache = load_potential_cache(cache_file, cfg, geometry)
             ~same_array(pot_cache.geometry_signature, active_signature) || ...
             ~same_array(pot_cache.omegas, cfg.freq.omegas) || ...
             ~same_array(pot_cache.headings, cfg.wave.headings)
-        error('CRESTU:CacheMismatch', 'Cache metadata do not match the active case/configuration.');
+        error('CRESTU:CacheMismatch','Cache metadata do not match the active case/configuration.');
     end
 end
 
@@ -54,7 +61,8 @@ function signature = geometry_signature(g)
 %   signature = geometry_signature(g)
 %
 % Description:
-%   The routine implements a component of the linear Rankine boundary-element formulation for incompressible, irrotational gravity-wave flow. Geometry, reflection parity, free-surface impedance, and complex phase follow the project convention exp(i*omega*t).
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
 %   g                  - [scalar] Gravitational acceleration, [m/s^2].
@@ -70,24 +78,25 @@ function signature = geometry_signature(g)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     signature = [sum(g.centers(:)), sum(g.centers(:) .^ 2), sum(g.normals(:)), ...
         sum(g.areas(:)), sum(g.vertices(:)), sum(g.vertices(:) .^ 2)];
 end
 
-function tf = same_array(a, b)
+function tf = same_array(a, actualSignature)
 % SAME_ARRAY Compare two numeric arrays using a scale-aware tolerance.
 %
 % Syntax:
-%   tf = same_array(a, b)
+%   tf = same_array(a, actualSignature)
 %
 % Description:
-%   The routine implements a component of the linear Rankine boundary-element formulation for incompressible, irrotational gravity-wave flow. Geometry, reflection parity, free-surface impedance, and complex phase follow the project convention exp(i*omega*t).
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
 %   a                  - First vector or scalar operand; dimensions and SI units follow the stated algorithm.
-%   b                  - Second vector or scalar operand; dimensions and SI units follow the stated algorithm.
+%   actualSignature                  - Second vector or scalar operand; dimensions and SI units follow the stated algorithm.
 %
 % Outputs:
 %   tf                 - [logical scalar] True when the tested condition is satisfied.
@@ -100,7 +109,9 @@ function tf = same_array(a, b)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    a = a(:); b = b(:); tf = numel(a) == numel(b) && all(abs(a - b) <= 1e-12 * max(1, max(abs([a;b]))));
+    a = a(:);
+    actualSignature = actualSignature(:);
+    tf = numel(a) == numel(actualSignature) && all(abs(a - actualSignature) <= 1e-12 * max(1, max(abs([a;actualSignature]))));
 end

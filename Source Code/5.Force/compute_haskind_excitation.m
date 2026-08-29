@@ -5,7 +5,8 @@ function force = compute_haskind_excitation(phi_radiation, nj, centers, normals,
 %   force = compute_haskind_excitation(phi_radiation, nj, centers, normals, areas, omega, cfg, headings, mode_parity)
 %
 % Description:
-%   The routine converts first-order potential-flow or rigid-body data into generalized hydrodynamic coefficients, loads, restoring terms, or motions. Translational and rotational quantities retain the global 6-DOF ordering used by CRESTU.
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
 %   phi_radiation      - [N x Ndof] Complex radiation potentials, [m^2/s].
@@ -29,21 +30,24 @@ function force = compute_haskind_excitation(phi_radiation, nj, centers, normals,
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    areas = reshape(areas, [], 1); headings = reshape(headings, 1, []);
-    ndof = size(nj, 2); nh = numel(headings); force = complex(zeros(ndof, nh));
+    areas = reshape(areas, [], 1);
+    headings = reshape(headings, 1, []);
+    ndof = size(nj, 2);
+    nh = numel(headings);
+    force = complex(zeros(ndof, nh));
     if nargin < 9 || isempty(mode_parity)
         mode_parity = get_mode_parities(cfg.n_bodies, cfg.isx, cfg.isy);
     end
     psi = phi_radiation / (1i * omega);
     for j = 1:ndof
         parity = mode_parity(j, :);
-        for h = 1:nh
+        for headingIndex = 1:nh
             [phi_I, dphi_I] = decompose_incident_wave_symmetry(centers, normals, omega, cfg.grav, ...
-                cfg.water_depth, headings(h), 1, cfg.isx, cfg.isy, parity);
+                cfg.water_depth, headings(headingIndex), 1, cfg.isx, cfg.isy, parity);
             integral = sum((nj(:, j) .* phi_I + psi(:, j) .* dphi_I) .* areas);
-            force(j, h) = -1i * omega * cfg.rho * cfg.symmetry.multiplicity * integral;
+            force(j, headingIndex) = -1i * omega * cfg.rho * cfg.symmetry.multiplicity * integral;
         end
     end
 end

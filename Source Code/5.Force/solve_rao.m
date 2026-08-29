@@ -5,7 +5,8 @@ function rao = solve_rao(omegas, added_mass, damping, hydrostatic, excitation, c
 %   rao = solve_rao(omegas, added_mass, damping, hydrostatic, excitation, cfg)
 %
 % Description:
-%   The routine converts first-order potential-flow or rigid-body data into generalized hydrodynamic coefficients, loads, restoring terms, or motions. Translational and rotational quantities retain the global 6-DOF ordering used by CRESTU.
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
 %   omegas             - [1 x Nf] Angular-frequency samples, [rad/s].
@@ -26,29 +27,64 @@ function rao = solve_rao(omegas, added_mass, damping, hydrostatic, excitation, c
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    omegas = reshape(omegas, 1, []); nf = numel(omegas); ndof = 6 * cfg.n_bodies;
-    added_mass = normalize_coeff(added_mass, ndof, nf, 'added mass');
-    damping = normalize_coeff(damping, ndof, nf, 'damping');
-    if ~isequal(size(hydrostatic), [ndof, ndof])
-        error('CRESTU:HydrostaticShape', 'Hydrostatic matrix must be %d-by-%d.', ndof, ndof);
+    omegas = reshape(omegas, 1, []);
+    frequencyCount = numel(omegas);
+    globalDofCount = 6 * cfg.n_bodies;
+    assert(frequencyCount > 0 && all(omegas > 0), ...
+        'CRESTU:RAOFrequency', 'All angular frequencies must be positive.');
+    added_mass = normalize_coeff(added_mass, globalDofCount, frequencyCount, 'added mass');
+    damping = normalize_coeff(damping, globalDofCount, frequencyCount, 'damping');
+
+    % A five-module model has 30 global DOFs. Module m uses
+    % 6*(m-1)+(1:6). Local DOF 1-6: Surge, Sway, Heave, Roll, Pitch, Yaw.
+    if ~isequal(size(hydrostatic), [globalDofCount, globalDofCount])
+        error('CRESTU:HydrostaticShape', ...
+            'Hydrostatic matrix must be %d-by-%d.', globalDofCount, globalDofCount);
     end
-    if ismatrix(excitation) && nf == 1, excitation = reshape(excitation, ndof, size(excitation, 2), 1); end
-    if size(excitation, 1) ~= ndof || size(excitation, 3) ~= nf
-        error('CRESTU:ExcitationShape', 'Excitation must be ndof-by-nheading-by-nfrequency.');
+
+    if ismatrix(excitation) && frequencyCount == 1
+        excitation = reshape(excitation, globalDofCount, size(excitation, 2), 1);
     end
-    nh = size(excitation, 2); M = assemble_mass_matrix(cfg.mass_props);
-    xi = complex(zeros(ndof, nh, nf)); dynamic_matrix = complex(zeros(ndof, ndof, nf)); rconds = zeros(nf, 1);
-    for k = 1:nf
-        w = omegas(k); Z = -w^2 * (M + added_mass(:, :, k)) + 1i * w * damping(:, :, k) + hydrostatic;
-        dynamic_matrix(:, :, k) = Z; rconds(k) = rcond(Z);
-        if rconds(k) < 1e-12, warning('CRESTU:IllConditionedRAO', 'RAO matrix at omega=%g has rcond=%g.', w, rconds(k)); end
-        xi(:, :, k) = Z \ excitation(:, :, k);
+
+    if size(excitation, 1) ~= globalDofCount || ...
+            size(excitation, 3) ~= frequencyCount
+        error('CRESTU:ExcitationShape', ...
+            'Excitation must be ndof-by-nheading-by-nfrequency.');
     end
-    rao = struct('complex', xi, 'amplitude', abs(xi), 'phase_deg', angle(xi) * 180 / pi, ...
-        'mass_matrix', M, 'dynamic_matrix', dynamic_matrix, 'rcond', rconds, ...
-        'omegas', omegas, 'headings', cfg.wave.headings);
+
+    %% Stage 2: Solve the coupled dynamic equation at each frequency
+
+    headingCount = size(excitation, 2);
+    M = assemble_mass_matrix(cfg.mass_props);
+    complexResponse = complex(zeros(globalDofCount, headingCount, frequencyCount));
+    dynamicMatrix = complex(zeros(globalDofCount, globalDofCount, frequencyCount));
+    reciprocalCondition = zeros(frequencyCount, 1);
+
+    for k = 1:frequencyCount
+        omega = omegas(k); % [rad/s]
+        dynamicStiffness = -omega ^ 2 * (M + added_mass(:, :, k)) + ...
+            1i * omega * damping(:, :, k) + hydrostatic;
+        dynamicMatrix(:, :, k) = dynamicStiffness;
+        reciprocalCondition(k) = rcond(dynamicStiffness);
+
+        if reciprocalCondition(k) < 1e-12
+            warning('CRESTU:IllConditionedRAO', ...
+                'RAO matrix at omega=%g has rcond=%g.', ...
+                omega, reciprocalCondition(k));
+        end
+
+        complexResponse(:, :, k) = dynamicStiffness \ excitation(:, :, k);
+    end
+
+    %% Stage 3: Preserve the response-field contract
+
+    rao = struct('complex', complexResponse, 'amplitude', abs(complexResponse), ...
+        'phase_deg', angle(complexResponse) * 180 / pi, ...
+        'mass_matrix', M, 'dynamic_matrix', dynamicMatrix, ...
+        'rcond', reciprocalCondition, 'omegas', omegas, ...
+        'headings', cfg.wave.headings);
 end
 
 function out = normalize_coeff(in, n, nf, label)
@@ -58,7 +94,8 @@ function out = normalize_coeff(in, n, nf, label)
 %   out = normalize_coeff(in, n, nf, label)
 %
 % Description:
-%   The routine converts first-order potential-flow or rigid-body data into generalized hydrodynamic coefficients, loads, restoring terms, or motions. Translational and rotational quantities retain the global 6-DOF ordering used by CRESTU.
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
 %   in                 - [character vector, string scalar, or numeric value] Value to normalize.
@@ -77,12 +114,20 @@ function out = normalize_coeff(in, n, nf, label)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if iscell(in), out = zeros(n, n, nf); for k = 1:nf, out(:, :, k) = in{k}; end
-    else, out = in; end
-    if nf == 1 && ismatrix(out), out = reshape(out, n, n, 1); end
+    if iscell(in)
+        out = zeros(n, n, nf);
+        for k = 1:nf
+            out(:, :, k) = in{k};
+        end
+    else
+        out = in;
+    end
+    if nf == 1 && ismatrix(out)
+        out = reshape(out, n, n, 1);
+    end
     if size(out, 1) ~= n || size(out, 2) ~= n || size(out, 3) ~= nf
-        error('CRESTU:CoefficientShape', '%s array has the wrong shape.', label);
+        error('CRESTU:CoefficientShape','%s array has the wrong shape.', label);
     end
 end

@@ -5,7 +5,8 @@ function full_mesh = expand_mesh_by_symmetry(mesh, isx, isy)
 %   full_mesh = expand_mesh_by_symmetry(mesh, isx, isy)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   mesh               - [struct] Boundary-panel mesh with Cartesian geometry in SI units.
@@ -23,12 +24,17 @@ function full_mesh = expand_mesh_by_symmetry(mesh, isx, isy)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     full_mesh = mesh;
-    if isx, full_mesh = append_reflection(full_mesh, 1); end
-    if isy, full_mesh = append_reflection(full_mesh, 2); end
-    full_mesh.isx = 0; full_mesh.isy = 0;
+    if isx
+        full_mesh = append_reflection(full_mesh, 1);
+    end
+    if isy
+        full_mesh = append_reflection(full_mesh, 2);
+    end
+    full_mesh.isx = 0;
+    full_mesh.isy = 0;
     full_mesh.header = sprintf('%s | geometric full expansion', mesh.header);
 end
 
@@ -39,7 +45,8 @@ function out = append_reflection(in, axis_index)
 %   out = append_reflection(in, axis_index)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   in                 - [character vector, string scalar, or numeric value] Value to normalize.
@@ -56,17 +63,19 @@ function out = append_reflection(in, axis_index)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    reflected = in; reflected.vertices(:, :, axis_index) = -reflected.vertices(:, :, axis_index);
+    reflected = in;
+    reflected.vertices(:, :, axis_index) = -reflected.vertices(:, :, axis_index);
     reflected.centers(:, axis_index) = -reflected.centers(:, axis_index);
     reflected.normals(:, axis_index) = -reflected.normals(:, axis_index);
     reflected.e1(:, axis_index) = -reflected.e1(:, axis_index);
     reflected.e2(:, axis_index) = -reflected.e2(:, axis_index);
-    % Reflection reverses vertex orientation. Swap 2 and 4 to preserve the
-    % original normal represented by the reflected normal array.
+% Reflection reverses vertex orientation. Swap 2 and 4 to preserve the
+% original normal represented by the reflected normal array.
     reflected.vertices(:, [2, 4], :) = reflected.vertices(:, [4, 2], :);
-    out = in; fields = {'vertices', 'centers', 'normals', 'areas', 'e1', 'e2', 'panel_type', 'mu_damping'};
+    out = in;
+    fields = {'vertices','centers','normals','areas','e1','e2','panel_type','mu_damping'};
     for k = 1:numel(fields)
         name = fields{k};
         if isfield(in, name) && ~isempty(in.(name))

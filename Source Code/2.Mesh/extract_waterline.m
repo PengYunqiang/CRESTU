@@ -5,7 +5,8 @@ function waterline = extract_waterline(mesh_body, z_tol)
 %   waterline = extract_waterline(mesh_body, z_tol)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   mesh_body          - [struct] Wetted-body panel mesh with Cartesian geometry in SI units.
@@ -22,9 +23,11 @@ function waterline = extract_waterline(mesh_body, z_tol)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
-    if nargin < 2, z_tol = 1e-3; end
+    if nargin < 2
+        z_tol = 1e-3;
+    end
 
     verts = mesh_body.vertices;
     normals = mesh_body.normals;
@@ -32,14 +35,16 @@ function waterline = extract_waterline(mesh_body, z_tol)
 
     edges = [];
     for k = 1:np
-        if norm(normals(k, 1:2)) < 0.2, continue; end
+        if norm(normals(k, 1:2)) < 0.2
+            continue;
+        end
 
-        p = squeeze(verts(k, :, :));
-        is_top = abs(p(:, 3)) <= z_tol;
+        panelVertices = squeeze(verts(k, :, :));
+        is_top = abs(panelVertices(:, 3)) <= z_tol;
         idx_top = find(is_top);
 
         if length(idx_top) == 2
-            edges = [edges; p(idx_top(1), 1:2), p(idx_top(2), 1:2)]; %#ok<AGROW>
+            edges = [edges; panelVertices(idx_top(1), 1:2), panelVertices(idx_top(2), 1:2)]; %#ok<AGROW>
         end
     end
 
@@ -51,25 +56,43 @@ function waterline = extract_waterline(mesh_body, z_tol)
     n_edges = size(edges, 1);
     used = false(n_edges, 1);
 
-    chain = [edges(1, 1:2); edges(1, 3:4)]; used(1) = true;
-    % Extend both ends.  A one-direction walk truncates an open half/quarter
-    % waterline whenever the arbitrary first edge lies inside the chain.
+    chain = [edges(1, 1:2); edges(1, 3:4)];
+    used(1) = true;
+% Extend both ends.  A one-direction walk truncates an open half/quarter
+% waterline whenever the arbitrary first edge lies inside the chain.
     while any(~used)
         found = false;
         for i = 1:n_edges
-            if used(i), continue; end
-            p_start = edges(i, 1:2); p_end = edges(i, 3:4);
+            if used(i)
+                continue;
+            end
+            p_start = edges(i, 1:2);
+            p_end = edges(i, 3:4);
             if norm(chain(end, :) - p_start) < tol_dist
-                chain = [chain;p_end]; used(i) = true; found = true; break; %#ok<AGROW>
+                chain = [chain;p_end];
+                used(i) = true;
+                found = true;
+                break; %#ok<AGROW>
             elseif norm(chain(end, :) - p_end) < tol_dist
-                chain = [chain;p_start]; used(i) = true; found = true; break; %#ok<AGROW>
+                chain = [chain;p_start];
+                used(i) = true;
+                found = true;
+                break; %#ok<AGROW>
             elseif norm(chain(1, :) - p_end) < tol_dist
-                chain = [p_start;chain]; used(i) = true; found = true; break; %#ok<AGROW>
+                chain = [p_start;chain];
+                used(i) = true;
+                found = true;
+                break; %#ok<AGROW>
             elseif norm(chain(1, :) - p_start) < tol_dist
-                chain = [p_end;chain]; used(i) = true; found = true; break; %#ok<AGROW>
+                chain = [p_end;chain];
+                used(i) = true;
+                found = true;
+                break; %#ok<AGROW>
             end
         end
-        if ~found, break; end
+        if ~found
+            break;
+        end
     end
 
     unique_chain = chain(1, :);
@@ -86,7 +109,8 @@ function waterline = extract_waterline(mesh_body, z_tol)
         unique_chain(end, :) = [];
     end
 
-    x = unique_chain(:, 1); y = unique_chain(:, 2);
+    x = unique_chain(:, 1);
+    y = unique_chain(:, 2);
     area2 = sum(x .* [y(2:end); y(1)] - y .* [x(2:end); x(1)]);
     if is_closed && area2 < 0
         unique_chain = flipud(unique_chain);
@@ -98,5 +122,5 @@ function waterline = extract_waterline(mesh_body, z_tol)
     waterline.n_pts = size(unique_chain, 1);
     waterline.is_closed = is_closed;
 
-    fprintf('>>> Waterline topology extraction completed: with %d continuous nodes (closed: %d)\n', waterline.n_pts, is_closed);
+    fprintf('[OK] Waterline extraction completed: with %d continuous nodes (closed: %d)\n', waterline.n_pts, is_closed);
 end

@@ -5,7 +5,8 @@ function mesh_global = transform_body_mesh(mesh_local, body_cfg)
 %   mesh_global = transform_body_mesh(mesh_local, body_cfg)
 %
 % Description:
-%   The routine constructs, transforms, validates, or visualizes boundary-panel geometry used by the Rankine solver. Coordinates are expressed in the global Cartesian frame and panel orientation is preserved so that normals remain consistent with boundary-integral signs.
+%   Prepares boundary-panel geometry for the Rankine solver.
+%   Global coordinates and panel-normal signs are preserved.
 %
 % Inputs:
 %   mesh_local         - [struct] Body mesh expressed in the local body-fixed frame, with coordinates in [m].
@@ -22,7 +23,7 @@ function mesh_global = transform_body_mesh(mesh_local, body_cfg)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% --- 1. Validate Inputs and Initialize the Algorithm ---
+%% Stage 1: Validate Inputs and Initialize the Algorithm
 
     mesh_global = mesh_local;
     x0 = body_cfg.pos;
@@ -34,10 +35,10 @@ function mesh_global = transform_body_mesh(mesh_local, body_cfg)
 
     np = mesh_local.n_panels;
 
-    for v = 1:4
-        pts_loc = reshape(mesh_local.vertices(:, v, :), np, 3);
+    for vertexIndex = 1:4
+        pts_loc = reshape(mesh_local.vertices(:, vertexIndex, :), np, 3);
         pts_glob = pts_loc * Rz' + repmat(x0, [np, 1]);
-        mesh_global.vertices(:, v, :) = pts_glob;
+        mesh_global.vertices(:, vertexIndex, :) = pts_glob;
     end
 
     mesh_global.centers = mesh_local.centers * Rz' + repmat(x0, [np, 1]);
@@ -45,7 +46,7 @@ function mesh_global = transform_body_mesh(mesh_local, body_cfg)
     mesh_global.e1 = mesh_local.e1 * Rz';
     mesh_global.e2 = mesh_local.e2 * Rz';
 
-    if isfield(mesh_local, 'hydrostatics') && mesh_local.hydrostatics.V_mean > 0
+    if isfield(mesh_local,'hydrostatics') && mesh_local.hydrostatics.V_mean > 0
         cb_loc = mesh_local.hydrostatics.center_of_buoyancy;
         mesh_global.hydrostatics.center_of_buoyancy = cb_loc * Rz' + x0;
     end
