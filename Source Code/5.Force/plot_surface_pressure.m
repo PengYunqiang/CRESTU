@@ -1,41 +1,66 @@
-function fig = plot_surface_pressure(mesh,pressure,component)
-% PLOT_SURFACE_PRESSURE Execute the documented plot_surface_pressure operation.
+function fig = plot_surface_pressure(mesh, pressure, component)
+% PLOT_SURFACE_PRESSURE Plot surface pressure for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
-%   fig = plot_surface_pressure(mesh,pressure,component)
+%   fig = plot_surface_pressure(mesh, pressure, component)
+%
+% Description:
+%   Computes hydrodynamic coefficients, loads, or rigid-body response.
+%   Results retain the CRESTU global 6-DOF order.
 %
 % Inputs:
-%   mesh            : [struct] Boundary mesh with geometry expressed in SI units.
-%   pressure        : [documented value] Input required by the implemented function contract.
-%   component       : [documented value] Input required by the implemented function contract.
+%   mesh               - [struct] Boundary-panel mesh with Cartesian geometry in SI units.
+%   pressure           - [N x K] Complex panel pressure or a selected pressure component, [Pa].
+%   component          - [character vector or string scalar] Pressure component selector.
 %
 % Outputs:
-%   fig             : [documented value] Function result; dimensions and units follow the implemented contract.
+%   fig                - [graphics handle] MATLAB figure containing the requested visualization.
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Linear unsteady Bernoulli pressure, generalized surface integration, hydrostatics, radiation energy, or the frequency-domain rigid-body equation as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
-%PLOT_SURFACE_PRESSURE Plot real, imaginary, amplitude, or phase pressure.
-    if nargin<3||isempty(component), component='amplitude'; end
-    switch lower(component)
-        case 'real', values=real(pressure);
-        case 'imag', values=imag(pressure);
-        case {'amplitude','abs'}, values=abs(pressure);
-        case {'phase','phase_deg'}, values=angle(pressure)*180/pi;
-        otherwise, error('CRESTU:PressureComponent','Unknown pressure component: %s',component);
+% References:
+%   - Newman, J. N. (1977), Marine Hydrodynamics; Faltinsen, O. M. (1990), Sea Loads on Ships and Offshore Structures.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% Stage 1: Validate Inputs and Initialize the Algorithm
+
+    if nargin < 3 || isempty(component)
+        component ='amplitude';
     end
-    if size(values,2)~=1||numel(values)~=mesh.n_panels
+    switch lower(component)
+        case 'real'
+            values = real(pressure);
+
+        case 'imag'
+            values = imag(pressure);
+
+        case {'amplitude','abs'}
+            values = abs(pressure);
+
+        case {'phase','phase_deg'}
+            values = angle(pressure) * 180 / pi;
+
+        otherwise
+            error('CRESTU:PressureComponent', ...
+'Unknown pressure component: %s', component);
+    end
+    if size(values, 2) ~= 1 || numel(values) ~= mesh.n_panels
         error('CRESTU:PressurePlotShape','Plot one pressure column with one value per panel.');
     end
-    vertices=reshape(mesh.vertices,mesh.n_panels,4,3);
-    X=reshape(vertices(:,:,1),mesh.n_panels,4).';
-    Y=reshape(vertices(:,:,2),mesh.n_panels,4).';
-    Z=reshape(vertices(:,:,3),mesh.n_panels,4).';
-    fig=figure('Color','w','Name','CRESTU surface pressure');
-    patch(X,Y,Z,values(:).','FaceColor','flat','EdgeColor',[.25,.25,.25]);
-    axis equal; grid on; view(3); colorbar; xlabel('x'); ylabel('y'); zlabel('z');
-    title(sprintf('Surface pressure: %s',component),'Interpreter','none');
+    vertices = reshape(mesh.vertices, mesh.n_panels, 4, 3);
+    X = reshape(vertices(:, :, 1), mesh.n_panels, 4).';
+    Y = reshape(vertices(:, :, 2), mesh.n_panels, 4).';
+    Z = reshape(vertices(:, :, 3), mesh.n_panels, 4).';
+    fig = figure('Color','w','Name','CRESTU surface pressure');
+    patch(X, Y, Z, values(:).','FaceColor','flat','EdgeColor', [.25, .25, .25]);
+    axis equal;
+    grid on;
+    view(3);
+    colorbar;
+    xlabel('x');
+    ylabel('y');
+    zlabel('z');
+    title(sprintf('Surface pressure: %s', component),'Interpreter','none');
 end

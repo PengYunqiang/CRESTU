@@ -13,23 +13,31 @@ function metrics = Build_Validation_Tables(single_summary_file, multi_summary_fi
 %
 % Mathematical Reference:
 %   Relative error = 100*abs(CRESTU-WAMIT)/max(abs(WAMIT),eps).
+%% Stage 1: Resolve paths and apply defaults
+
     common_directory = fileparts(mfilename('fullpath'));
+
+%% Stage 2: Run the core calculation
+
     case_wave_directory = fileparts(common_directory);
     code_root = fileparts(case_wave_directory);
-    addpath(common_directory, fullfile(code_root, '5.Force'), fullfile(code_root, '6.MeanDriftLoads'));
+    addpath(common_directory, fullfile(code_root,'5.Force'), fullfile(code_root,'6.MeanDriftLoads'));
     if nargin < 1 || isempty(single_summary_file)
-        single_summary_file = fullfile(case_wave_directory, 'Case1_SingleSphere_Convergence', ...
-            'SingleSphere_Convergence_Summary.mat');
+        single_summary_file = fullfile(case_wave_directory,'Case1_SingleSphere_Convergence', ...
+'SingleSphere_Convergence_Summary.mat');
     end
     if nargin < 2 || isempty(multi_summary_file)
-        multi_summary_file = fullfile(case_wave_directory, 'Case2_TwoSpheres_Interaction', ...
-            'TwoSpheres_Interaction_Summary.mat');
+        multi_summary_file = fullfile(case_wave_directory,'Case2_TwoSpheres_Interaction', ...
+'TwoSpheres_Interaction_Summary.mat');
     end
+    assert(isfile(single_summary_file), 'CRESTU:MissingValidationSummary', ...
+        'Single-sphere summary was not found: %s', single_summary_file);
+    assert(isfile(multi_summary_file), 'CRESTU:MissingValidationSummary', ...
+        'Two-sphere summary was not found: %s', multi_summary_file);
+    fprintf('[INFO] Build validation tables from completed case summaries.\n');
 
-% ==========================================
-% Single-sphere frequency table
-% ==========================================
-    single_data = load(single_summary_file, 'summary');
+%% Stage 2: Build the single-sphere frequency table
+    single_data = load(single_summary_file,'summary');
     single = single_data.summary;
     fine = single.results{3};
     medium = single.results{2};
@@ -59,26 +67,24 @@ function metrics = Build_Validation_Tables(single_summary_file, multi_summary_fi
         drift_far_cd, drift_momentum_cd, ...
         relative_error(squeeze(fine.added_mass(3, 3, :)), squeeze(medium.added_mass(3, 3, :))), ...
         relative_error(squeeze(fine.damping(3, 3, :)), squeeze(medium.damping(3, 3, :))), ...
-        'VariableNames', {'omega_rad_s', 'A33_CRESTU', 'A33_WAMIT', 'A33_error_pct', ...
-        'B33_CRESTU', 'B33_WAMIT', 'B33_error_pct', 'Fz_CRESTU_N', 'Fz_WAMIT_N', ...
-        'Fz_error_pct', 'Heave_RAO_CRESTU', 'Heave_RAO_WAMIT', 'Heave_RAO_error_pct', ...
-        'Drift_near_Cd', 'Drift_WAMIT_pressure_Cd', 'Drift_far_Cd', ...
-        'Drift_WAMIT_momentum_Cd', 'A33_fine_medium_pct', 'B33_fine_medium_pct'});
-    single_csv = fullfile(fileparts(single_summary_file), 'SingleSphere_Validation_Metrics.csv');
+'VariableNames', {'omega_rad_s','A33_CRESTU','A33_WAMIT','A33_error_pct', ...
+'B33_CRESTU','B33_WAMIT','B33_error_pct','Fz_CRESTU_N','Fz_WAMIT_N', ...
+'Fz_error_pct','Heave_RAO_CRESTU','Heave_RAO_WAMIT','Heave_RAO_error_pct', ...
+'Drift_near_Cd','Drift_WAMIT_pressure_Cd','Drift_far_Cd', ...
+'Drift_WAMIT_momentum_Cd','A33_fine_medium_pct','B33_fine_medium_pct'});
+    single_csv = fullfile(fileparts(single_summary_file),'SingleSphere_Validation_Metrics.csv');
     writetable(single_table, single_csv);
 
-% ==========================================
-% Two-sphere self/cross and RAO table
-% ==========================================
-    multi_data = load(multi_summary_file, 'summary');
+%% Stage 3: Build the two-sphere coefficient and RAO table
+    multi_data = load(multi_summary_file,'summary');
     multi = multi_data.summary;
     multi_result = multi.results;
     multi_reference = multi.reference;
     multi_index = match_reference_grid(multi_reference.radiation.omegas, multi_result.omegas);
     omega_multi = multi_result.omegas(:);
     coefficient_pairs = [1, 1; 3, 3; 1, 7; 3, 9];
-    coefficient_names = {'11', '33', '17', '39'};
-    multi_table = table(omega_multi, 'VariableNames', {'omega_rad_s'});
+    coefficient_names = {'11','33','17','39'};
+    multi_table = table(omega_multi,'VariableNames', {'omega_rad_s'});
     for pair_index = 1:size(coefficient_pairs, 1)
         row = coefficient_pairs(pair_index, 1);
         column = coefficient_pairs(pair_index, 2);
@@ -103,16 +109,14 @@ function metrics = Build_Validation_Tables(single_summary_file, multi_summary_fi
         nrmse = zeros(numel(omega_multi), 1);
         for frequency = 1:numel(omega_multi)
             nrmse(frequency) = 100 * norm(crestu_rao(:, frequency) - wamit_rao(:, frequency)) ...
-                / max(norm(wamit_rao(:, frequency)), eps);
+ / max(norm(wamit_rao(:, frequency)), eps);
         end
         multi_table.(sprintf('RAO_NRMSE_%ddeg_pct', heading_pairs(heading_index, 1))) = nrmse;
     end
-    multi_csv = fullfile(fileparts(multi_summary_file), 'TwoSpheres_Validation_Metrics.csv');
+    multi_csv = fullfile(fileparts(multi_summary_file),'TwoSpheres_Validation_Metrics.csv');
     writetable(multi_table, multi_csv);
 
-% ==========================================
-% Aggregate metrics for the report
-% ==========================================
+%% Stage 4: Aggregate metrics and export reconciliation files
     metrics = struct();
     metrics.single_csv = single_csv;
     metrics.multi_csv = multi_csv;
@@ -129,14 +133,18 @@ function metrics = Build_Validation_Tables(single_summary_file, multi_summary_fi
         metrics.multi_median_error_pct(pair_index, 2) = median(multi_table.(['B' suffix '_error_pct']));
     end
     metrics.max_added_mass_symmetry_residual = max(arrayfun(@(index) ...
-        norm(multi_result.added_mass(:, :, index) - multi_result.added_mass(:, :, index).', 'fro') ...
-        / max(norm(multi_result.added_mass(:, :, index), 'fro'), eps), 1:numel(omega_multi)));
+        norm(multi_result.added_mass(:, :, index) - multi_result.added_mass(:, :, index).','fro') ...
+ / max(norm(multi_result.added_mass(:, :, index),'fro'), eps), 1:numel(omega_multi)));
     metrics.max_damping_symmetry_residual = max(arrayfun(@(index) ...
-        norm(multi_result.damping(:, :, index) - multi_result.damping(:, :, index).', 'fro') ...
-        / max(norm(multi_result.damping(:, :, index), 'fro'), eps), 1:numel(omega_multi)));
-    metrics_file = fullfile(case_wave_directory, 'Validation_Metrics.mat');
-    save(metrics_file, 'metrics', 'single_table', 'multi_table');
-    fprintf('>>> Validation tables exported:\n    %s\n    %s\n', single_csv, multi_csv);
+        norm(multi_result.damping(:, :, index) - multi_result.damping(:, :, index).','fro') ...
+ / max(norm(multi_result.damping(:, :, index),'fro'), eps), 1:numel(omega_multi)));
+    metrics_file = fullfile(case_wave_directory,'Validation_Metrics.mat');
+    save(metrics_file,'metrics','single_table','multi_table');
+    reconciliation = table(["A33"; "B33"; "Fz"; "HeaveRAO"], ...
+        metrics.single_mean_error_pct(:), ...
+        'VariableNames', {'Metric', 'MeanRelativeErrorPercent'});
+    disp(reconciliation);
+    fprintf('[OK] Validation tables exported:\n    %s\n    %s\n', single_csv, multi_csv);
 end
 
 function error_pct = relative_error(value, reference)
@@ -154,5 +162,7 @@ function error_pct = relative_error(value, reference)
 %
 % Mathematical Reference:
 %   error_pct = 100*abs(value-reference)/max(abs(reference),eps).
+%% Stage 1: Initialize inputs and dependencies
+
     error_pct = 100 * abs(value - reference) ./ max(abs(reference), eps);
 end

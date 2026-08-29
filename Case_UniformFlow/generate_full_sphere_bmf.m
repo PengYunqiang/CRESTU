@@ -1,100 +1,204 @@
-function mesh_body = generate_full_sphere_bmf(filename, diameter, isx, isy, N)
-% GENERATE_FULL_SPHERE_BMF 生成纯四边形完整封闭球体物面网格 (Full Sphere) 并导出为 .bmf (Type = 1)
+function mesh_body = generate_full_sphere_bmf(filename, diameter, isx, isy, panelDivisionCount)
+% GENERATE_FULL_SPHERE_BMF Generate a closed cubed-sphere panel mesh and write a BMF file.
 %
-% 算法:
-%   采用标准 6 面立方体等角正切球面投影 (Cubed Sphere with equiangular tangent projection)
-%   全域无极点退化面元，各面元正交性与长宽比极佳。
+% Syntax:
+%   mesh_body = generate_full_sphere_bmf(filename, diameter, isx, isy, panelDivisionCount)
+%
+% Description:
+%   Generates a closed quadrilateral sphere by an equiangular cubed-sphere
+%   projection. Panel vertices are ordered so normals point into the fluid.
+%
+% Inputs:
+%   filename           - Output BMF path, character vector or string scalar [-].
+%   diameter           - Sphere diameter, positive scalar [m].
+%   isx                - Reflection flag for the x = 0 plane, 0 or 1 [-].
+%   isy                - Reflection flag for the y = 0 plane, 0 or 1 [-].
+%   panelDivisionCount - Panel divisions per cube-face direction [-].
+%
+% Outputs:
+%   mesh_body          - Closed body-panel mesh with coordinates [m].
+%
+% Governing Equations / Theory:
+%   Each cube coordinate is mapped with tan(pi*x/4), normalized, and
+%   multiplied by the sphere radius. This removes pole-degenerate panels.
+%
+% References:
+%   - Standard cubed-sphere mesh-generation methods.
+%   - CRESTU theory and technical manual.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-    if nargin < 1 || isempty(filename), filename = 'full_sphere_body.bmf'; end
-    if nargin < 2, diameter = 10.0; end
-    if nargin < 3, isx = 0; end
-    if nargin < 4, isy = 0; end
-    if nargin < 5, N = 8; end
+    %% Stage 1: Apply defaults and validate inputs
 
-    R = diameter / 2.0;
+    if nargin < 1 || isempty(filename)
+        filename ='full_sphere_body.bmf';
+    end
 
-    % 1. 构建完整立方体 6 个面 (坐标范围 [-1, 1] x [-1, 1])
-    grid_lin = linspace(-1, 1, 2 * N + 1);
-    [U, V] = meshgrid(grid_lin, grid_lin);
-    ones_mat = ones(size(U));
+    if nargin < 2
+        diameter = 10.0;
+    end
+
+    if nargin < 3
+        isx = 0;
+    end
+
+    if nargin < 4
+        isy = 0;
+    end
+
+    if nargin < 5
+        panelDivisionCount = 8;
+    end
+
+    validateattributes(filename, {'char','string'}, {'nonempty'}, mfilename,'filename');
+    validateattributes(diameter, {'double'}, {'scalar','positive','finite'}, mfilename,'diameter');
+    validateattributes(isx, {'double','logical'}, {'scalar'}, mfilename,'isx');
+    validateattributes(isy, {'double','logical'}, {'scalar'}, mfilename,'isy');
+    validateattributes(panelDivisionCount, {'double'}, ...
+        {'scalar','integer','positive','finite'}, mfilename,'panelDivisionCount');
+    assert(ismember(isx, [0, 1]) && ismember(isy, [0, 1]), ...
+'CRESTU:SphereSymmetryFlag','ISX and ISY must be 0 or 1.');
+
+    sphereRadius = diameter / 2.0; % [m]
+
+    %% Stage 2: Build the six cube faces
+
+    gridCoordinates = linspace(-1, 1, 2 * panelDivisionCount + 1);
+    [cubeCoordinateOne, cubeCoordinateTwo] = meshgrid(gridCoordinates, gridCoordinates);
+    unitFace = ones(size(cubeCoordinateOne));
 
     faces = cell(6, 1);
-    faces{1} = { ones_mat,  U,         V        }; % +X 面
-    faces{2} = {-ones_mat, -U,         V        }; % -X 面
-    faces{3} = { U,         ones_mat,  V        }; % +Y 面
-    faces{4} = {-U,        -ones_mat,  V        }; % -Y 面
-    faces{5} = { U,         V,         ones_mat }; % +Z 顶面 (封闭上半球)
-    faces{6} = {-U,         V,        -ones_mat }; % -Z 底面 (下半球)
+    faces{1} = { unitFace, cubeCoordinateOne, cubeCoordinateTwo}; % +X face
+    faces{2} = {-unitFace, -cubeCoordinateOne, cubeCoordinateTwo}; % -X face
+    faces{3} = { cubeCoordinateOne, unitFace, cubeCoordinateTwo}; % +Y face
+    faces{4} = {-cubeCoordinateOne, -unitFace, cubeCoordinateTwo}; % -Y face
+    faces{5} = { cubeCoordinateOne, cubeCoordinateTwo, unitFace}; % +Z face
+    faces{6} = {-cubeCoordinateOne, cubeCoordinateTwo, -unitFace}; % -Z face
 
-    raw_panels = [];
+    maximumPanelCount = 24 * panelDivisionCount ^ 2;
+    rawPanels = zeros(maximumPanelCount, 4, 3); % [m]
+    acceptedPanelCount = 0;
 
-    % 2. 遍历 6 个面并等角投影至球面
-    for f = 1:6
-        Xf = faces{f}{1};
-        Yf = faces{f}{2};
-        Zf = faces{f}{3};
-        [nr, nc] = size(Xf);
+    %% Stage 3: Project all cube faces onto the sphere
 
-        for r = 1:nr-1
-            for c = 1:nc-1
-                c1 = [Xf(r, c),     Yf(r, c),     Zf(r, c)];
-                c2 = [Xf(r, c+1),   Yf(r, c+1),   Zf(r, c+1)];
-                c3 = [Xf(r+1, c+1), Yf(r+1, c+1), Zf(r+1, c+1)];
-                c4 = [Xf(r+1, c),   Yf(r+1, c),   Zf(r+1, c)];
+    for faceIndex = 1:6
+        faceX = faces{faceIndex}{1};
+        faceY = faces{faceIndex}{2};
+        faceZ = faces{faceIndex}{3};
+        [faceRowCount, faceColumnCount] = size(faceX);
 
-                p1 = project_sphere(c1, R);
-                p2 = project_sphere(c2, R);
-                p3 = project_sphere(c3, R);
-                p4 = project_sphere(c4, R);
+        for rowIndex = 1:faceRowCount - 1
+            for columnIndex = 1:faceColumnCount - 1
+                cubeVertexOne = [faceX(rowIndex, columnIndex), ...
+                    faceY(rowIndex, columnIndex), faceZ(rowIndex, columnIndex)];
+                cubeVertexTwo = [faceX(rowIndex, columnIndex + 1), ...
+                    faceY(rowIndex, columnIndex + 1), faceZ(rowIndex, columnIndex + 1)];
+                cubeVertexThree = [faceX(rowIndex + 1, columnIndex + 1), ...
+                    faceY(rowIndex + 1, columnIndex + 1), faceZ(rowIndex + 1, columnIndex + 1)];
+                cubeVertexFour = [faceX(rowIndex + 1, columnIndex), ...
+                    faceY(rowIndex + 1, columnIndex), faceZ(rowIndex + 1, columnIndex)];
 
-                p_center = (p1 + p2 + p3 + p4) / 4.0;
+                vertexOne = project_sphere(cubeVertexOne, sphereRadius); % [m]
+                vertexTwo = project_sphere(cubeVertexTwo, sphereRadius); % [m]
+                vertexThree = project_sphere(cubeVertexThree, sphereRadius); % [m]
+                vertexFour = project_sphere(cubeVertexFour, sphereRadius); % [m]
+                panelCenter = (vertexOne + vertexTwo + vertexThree + vertexFour) / 4.0; % [m]
 
-                % 对称性截断过滤
-                if isx == 1 && (p_center(1) < -1e-6), continue; end
-                if isy == 1 && (p_center(2) < -1e-6), continue; end
-
-                % 确保法向严格向外指向流体 (+z / 径向背离球心)
-                v12 = p2 - p1;
-                v14 = p4 - p1;
-                if dot(cross(v12, v14), p_center) < 0
-                    p_temp = p2; p2 = p4; p4 = p_temp;
+                if isx == 1 && panelCenter(1) < -1e-6
+                    continue;
                 end
 
-                raw_panels = cat(1, raw_panels, reshape([p1; p2; p3; p4], [1, 4, 3]));
+                if isy == 1 && panelCenter(2) < -1e-6
+                    continue;
+                end
+
+                edgeOne = vertexTwo - vertexOne; % [m]
+                edgeTwo = vertexFour - vertexOne; % [m]
+
+                if dot(cross(edgeOne, edgeTwo), panelCenter) < 0
+                    temporaryVertex = vertexTwo;
+                    vertexTwo = vertexFour;
+                    vertexFour = temporaryVertex;
+                end
+
+                acceptedPanelCount = acceptedPanelCount + 1;
+                rawPanels(acceptedPanelCount, :, :) = ...
+                    reshape([vertexOne; vertexTwo; vertexThree; vertexFour], [1, 4, 3]);
             end
         end
     end
 
-    % 3. 构建结构体并写入 BMF
-    total_panels = size(raw_panels, 1);
-    mesh_body.header     = sprintf('Pure-Quad Full Sphere D=%.2fm, ISX=%d, ISY=%d', diameter, isx, isy);
-    mesh_body.ulen       = 1.0;
-    mesh_body.panel_type = repmat(1, [total_panels, 1]); % 1 = BODY
-    mesh_body.isx        = isx;
-    mesh_body.isy        = isy;
-    mesh_body.n_panels   = total_panels;
-    mesh_body.vertices   = raw_panels;
+    rawPanels = rawPanels(1:acceptedPanelCount, :, :);
+
+    %% Stage 4: Write the BMF mesh and check displaced volume
+
+    totalPanelCount = size(rawPanels, 1);
+    mesh_body = struct();
+    mesh_body.header = sprintf('Pure-Quad Full Sphere D=%.2fm, ISX=%d, ISY=%d', ...
+        diameter, isx, isy);
+    mesh_body.ulen = 1.0;
+    mesh_body.panel_type = ones(totalPanelCount, 1); % 1 = body panel
+    mesh_body.isx = isx;
+    mesh_body.isy = isy;
+    mesh_body.n_panels = totalPanelCount;
+    mesh_body.vertices = rawPanels;
 
     write_bmf(filename, mesh_body);
     mesh_body = read_bmf(filename);
 
-    % 4. 几何与静水力自检
-    V_exact = 4.0 / 3.0 * pi * R^3;
-    if isx == 1, V_exact = V_exact / 2.0; end
-    if isy == 1, V_exact = V_exact / 2.0; end
+    referenceVolume = 4.0 / 3.0 * pi * sphereRadius ^ 3; % [m^3]
 
-    fprintf('>>> 全球体网格生成完毕: 文件 [%s], 面元数: %d\n', filename, total_panels);
-    fprintf('    理论排水体积: %.4f m^3, 数值积分体积: %.4f m^3 (误差: %.4f%%)\n', ...
-            V_exact, mesh_body.hydrostatics.V_mean, ...
-            abs(mesh_body.hydrostatics.V_mean - V_exact)/V_exact * 100);
+    if isx == 1
+        referenceVolume = referenceVolume / 2.0;
+    end
+
+    if isy == 1
+        referenceVolume = referenceVolume / 2.0;
+    end
+
+    volumeErrorPercent = abs(mesh_body.hydrostatics.V_mean - referenceVolume) / ...
+        referenceVolume * 100; % [%]
+    fprintf('[OK] Full-sphere mesh generated | file = %s | panels = %d\n', ...
+        filename, totalPanelCount);
+    fprintf(['[OK] Volume check | reference = %.4f m^3 | integrated = %.4f m^3 | ', ...
+'error = %.4f%%\n'], referenceVolume, mesh_body.hydrostatics.V_mean, ...
+        volumeErrorPercent);
 end
 
-% -------------------------------------------------------------------------
-% 辅助函数: 等角正切投影 (保持面元接近正交均匀)
-% -------------------------------------------------------------------------
-function P = project_sphere(pt, R)
-    x = tan(pt(1) * pi / 4);
-    y = tan(pt(2) * pi / 4);
-    z = tan(pt(3) * pi / 4);
-    P = R * [x, y, z] / sqrt(x^2 + y^2 + z^2);
+function projectedPoint = project_sphere(cubePoint, sphereRadius)
+% PROJECT_SPHERE Project a cube-face point onto a sphere.
+%
+% Syntax:
+%   projectedPoint = project_sphere(cubePoint, sphereRadius)
+%
+% Description:
+%   Applies the equiangular tangent mapping and radial normalization.
+%
+% Inputs:
+%   cubePoint    - Cube-face point, [1 x 3] [-].
+%   sphereRadius - Sphere radius [m].
+%
+% Outputs:
+%   projectedPoint - Projected sphere point, [1 x 3] [m].
+%
+% Governing Equations / Theory:
+%   P = R*tan(pi*p/4)/norm(tan(pi*p/4)).
+%
+% References:
+%   - Standard cubed-sphere mesh-generation methods.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+    %% Stage 1: Validate the projection inputs
+
+    validateattributes(cubePoint, {'double'}, {'row','numel', 3,'finite'});
+    validateattributes(sphereRadius, {'double'}, {'scalar','positive','finite'});
+
+    %% Stage 2: Apply the equiangular tangent projection
+
+    mappedX = tan(cubePoint(1) * pi / 4);
+    mappedY = tan(cubePoint(2) * pi / 4);
+    mappedZ = tan(cubePoint(3) * pi / 4);
+    mappedRadius = sqrt(mappedX ^ 2 + mappedY ^ 2 + mappedZ ^ 2);
+    projectedPoint = sphereRadius * [mappedX, mappedY, mappedZ] / mappedRadius; % [m]
 end

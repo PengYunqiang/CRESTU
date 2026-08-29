@@ -1,120 +1,152 @@
-function [G, dGdn] = rankine_panel_integrals(P_in, X, normal)
-% RANKINE_PANEL_INTEGRALS Execute the documented rankine_panel_integrals operation.
+function [potentialIntegral, normalDerivativeIntegral] = ...
+    rankine_panel_integrals(panelVerticesInput, fieldPoint, normal)
+% RANKINE_PANEL_INTEGRALS Evaluate the analytic Rankine source and source-normal panel integrals.
 %
 % Syntax:
-%   [G, dGdn] = rankine_panel_integrals(P_in, X, normal)
+%   [potentialIntegral, normalDerivativeIntegral] = ...
+%       rankine_panel_integrals(panelVerticesInput, fieldPoint, normal)
+%
+% Description:
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
-%   P_in            : [documented value] Input required by the implemented function contract.
-%   X               : [documented value] Input required by the implemented function contract.
-%   normal          : [integer scalar or array] Discrete count or index required by the algorithm.
+%   panelVerticesInput - [4 x 3] or [3 x 4] Ordered panel vertices [m].
+%   fieldPoint         - [1 x 3] Field or collocation point [m].
+%   normal             - [1 x 3] Unit source-panel normal, dimensionless.
 %
 % Outputs:
-%   G               : [scalar] Gravitational acceleration, in m/s^2.
-%   dGdn            : [documented value] Function result; dimensions and units follow the implemented contract.
+%   potentialIntegral  - [scalar] Surface integral of the Rankine kernel 1/r [m].
+%   normalDerivativeIntegral - [scalar] Source-normal derivative integral [-].
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Green third identity, the Rankine kernel 1/r, linearized free-surface theory, and reflection symmetry as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
+% References:
+%   - Newman, J. N. (1977), Marine Hydrodynamics; Hess and Smith (1964); project boundary-condition specification.
 %
-%
-%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-    P = squeeze(P_in);
-    if size(P, 1) == 3 && size(P, 2) == 4
-        P = P'; % Normalize the vertex array to a 4-by-3 matrix.
+%% Stage 1: Validate Inputs and Initialize the Algorithm
+
+    panelVertices = squeeze(panelVerticesInput);
+    if size(panelVertices, 1) == 3 && size(panelVertices, 2) == 4
+        panelVertices = panelVertices';
     end
-    
-    p_center = mean(P, 1);
-    
-    e3 = normal / norm(normal);
-    e1 = P(2, :) - P(1, :);
-    e1 = e1 - dot(e1, e3) * e3;
-    if norm(e1) < 1e-12
-        e1 = P(3, :) - P(2, :);
-        e1 = e1 - dot(e1, e3) * e3;
+
+    panelCenter = mean(panelVertices, 1); % [m]
+
+    panelNormal = normal / norm(normal);
+    panelTangentOne = panelVertices(2, :) - panelVertices(1, :);
+    panelTangentOne = panelTangentOne - ...
+        dot(panelTangentOne, panelNormal) * panelNormal;
+    if norm(panelTangentOne) < 1e-12
+        panelTangentOne = panelVertices(3, :) - panelVertices(2, :);
+        panelTangentOne = panelTangentOne - ...
+            dot(panelTangentOne, panelNormal) * panelNormal;
     end
-    e1 = e1 / norm(e1);
-    e2 = cross(e3, e1);
-    
-    T = [e1; e2; e3];
-    
-    P_loc = (P - p_center) * T';
-    X_loc = (X - p_center) * T';
-    
-    x = X_loc(1); 
-    y = X_loc(2); 
-    z = X_loc(3);
-    
-    xi  = [P_loc(:, 1); P_loc(1, 1)];
-    eta = [P_loc(:, 2); P_loc(1, 2)];
-    
-    G = 0.0;
-    dGdn = 0.0;
-    eps_tol = 1e-12;
-    
+    panelTangentOne = panelTangentOne / norm(panelTangentOne);
+    panelTangentTwo = cross(panelNormal, panelTangentOne);
+
+    transformationMatrix = [panelTangentOne; panelTangentTwo; panelNormal];
+
+    localVertices = (panelVertices - panelCenter) * transformationMatrix';
+    localFieldPoint = (fieldPoint - panelCenter) * transformationMatrix';
+
+    localX = localFieldPoint(1);
+    localY = localFieldPoint(2);
+    localZ = localFieldPoint(3);
+
+    vertexX = [localVertices(:, 1); localVertices(1, 1)];
+    vertexY = [localVertices(:, 2); localVertices(1, 2)];
+
+    potentialIntegral = 0.0;
+    normalDerivativeIntegral = 0.0;
+    geometricTolerance = 1e-12;
+
     for k = 1:4
-        x1 = xi(k);     y1 = eta(k);
-        x2 = xi(k+1);   y2 = eta(k+1);
-        
-        dx = x2 - x1; 
-        dy = y2 - y1;
-        d12 = sqrt(dx^2 + dy^2);
-        if d12 < eps_tol, continue; end
-        
-        r1 = sqrt((x - x1)^2 + (y - y1)^2 + z^2);
-        r2 = sqrt((x - x2)^2 + (y - y2)^2 + z^2);
-        
-        cos_th = dx / d12;
-        sin_th = dy / d12;
-        
-        t0 = (x1 - x) * sin_th - (y1 - y) * cos_th;
-        
-        denom_log = r1 + r2 - d12;
-        if denom_log > eps_tol
-            log_term = log((r1 + r2 + d12) / denom_log);
-            G = G + t0 * log_term;
+        vertexXOne = vertexX(k);
+        vertexYOne = vertexY(k);
+        vertexXTwo = vertexX(k + 1);
+        vertexYTwo = vertexY(k + 1);
+
+        edgeX = vertexXTwo - vertexXOne;
+        edgeY = vertexYTwo - vertexYOne;
+        edgeLength = sqrt(edgeX^2 + edgeY^2); % [m]
+        if edgeLength < geometricTolerance
+            continue;
         end
-        
+
+        distanceOne = sqrt((localX - vertexXOne)^2 + ...
+            (localY - vertexYOne)^2 + localZ^2); % [m]
+        distanceTwo = sqrt((localX - vertexXTwo)^2 + ...
+            (localY - vertexYTwo)^2 + localZ^2); % [m]
+
+        edgeCosine = edgeX / edgeLength;
+        edgeSine = edgeY / edgeLength;
+
+        signedDistance = (vertexXOne - localX) * edgeSine - ...
+            (vertexYOne - localY) * edgeCosine; % [m]
+
+        logarithmDenominator = distanceOne + distanceTwo - edgeLength;
+        if logarithmDenominator > geometricTolerance
+            logarithmTerm = log((distanceOne + distanceTwo + edgeLength) / ...
+                logarithmDenominator);
+            potentialIntegral = potentialIntegral + signedDistance * logarithmTerm;
+        end
+
     end
 
-    % Robust oriented solid angle.  For source-normal differentiation,
-    % d/dn_y(1/|X-y|) is minus the oriented angle seen from X.
-    if abs(z) > eps_tol
-        a=P(1,:)-X; b=P(2,:)-X; c=P(3,:)-X; d=P(4,:)-X;
-        omega=triangle_solid_angle(a,b,c)+triangle_solid_angle(a,c,d);
-        dGdn=-omega;
+% Robust oriented solid angle.  For source-normal differentiation,
+% d/dn_y(1/|X-y|) is minus the oriented angle seen from X.
+    if abs(localZ) > geometricTolerance
+        vertexVectorOne = panelVertices(1, :) - fieldPoint;
+        vertexVectorTwo = panelVertices(2, :) - fieldPoint;
+        vertexVectorThree = panelVertices(3, :) - fieldPoint;
+        vertexVectorFour = panelVertices(4, :) - fieldPoint;
+        solidAngle = triangle_solid_angle(vertexVectorOne, vertexVectorTwo, ...
+            vertexVectorThree) + triangle_solid_angle(vertexVectorOne, ...
+            vertexVectorThree, vertexVectorFour);
+        normalDerivativeIntegral = -solidAngle;
     end
-    
-    G = G - z * dGdn;
+
+    potentialIntegral = potentialIntegral - localZ * normalDerivativeIntegral;
 
 end
 
-function omega=triangle_solid_angle(a,b,c)
-% TRIANGLE_SOLID_ANGLE Execute the documented triangle_solid_angle operation.
+function solidAngle = triangle_solid_angle(vertexVectorOne, vertexVectorTwo, vertexVectorThree)
+% TRIANGLE_SOLID_ANGLE Evaluate the signed solid angle subtended by a triangular facet.
 %
 % Syntax:
-%   omega=triangle_solid_angle(a,b,c)
+%   solidAngle = triangle_solid_angle(vertexVectorOne, vertexVectorTwo, vertexVectorThree)
+%
+% Description:
+%   Implements linear Rankine potential-flow operations.
+%   Symmetry and phase follow exp(i*omega*t).
 %
 % Inputs:
-%   a               : [documented value] Input required by the implemented function contract.
-%   b               : [documented value] Input required by the implemented function contract.
-%   c               : [documented value] Input required by the implemented function contract.
+%   vertexVectorOne   - [1 x 3] First vertex relative to the field point [m].
+%   vertexVectorTwo   - [1 x 3] Second vertex relative to the field point [m].
+%   vertexVectorThree - [1 x 3] Third vertex relative to the field point [m].
 %
 % Outputs:
-%   omega           : [scalar] Angular frequency, in rad/s.
+%   solidAngle         - [scalar] Signed solid angle [sr].
 %
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
+% Governing Equations / Theory:
+%   Green third identity, the Rankine kernel 1/r, linearized free-surface theory, and reflection symmetry as applicable.
 %
-% ==========================================
-% Function implementation
-% ==========================================
-    numerator=dot(a,cross(b,c));
-    denominator=norm(a)*norm(b)*norm(c)+dot(a,b)*norm(c)+ ...
-        dot(b,c)*norm(a)+dot(c,a)*norm(b);
-    omega=2*atan2(numerator,denominator);
+% References:
+%   - Newman, J. N. (1977), Marine Hydrodynamics; Hess and Smith (1964); project boundary-condition specification.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+%% Stage 1: Validate Inputs and Initialize the Algorithm
+
+    numerator = dot(vertexVectorOne, cross(vertexVectorTwo, vertexVectorThree));
+    denominator = norm(vertexVectorOne) * norm(vertexVectorTwo) * ...
+        norm(vertexVectorThree) + dot(vertexVectorOne, vertexVectorTwo) * ...
+        norm(vertexVectorThree) + dot(vertexVectorTwo, vertexVectorThree) * ...
+        norm(vertexVectorOne) + dot(vertexVectorThree, vertexVectorOne) * ...
+        norm(vertexVectorTwo);
+    solidAngle = 2 * atan2(numerator, denominator);
 end

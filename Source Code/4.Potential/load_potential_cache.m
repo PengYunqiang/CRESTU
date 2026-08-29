@@ -1,86 +1,69 @@
-function pot_cache = load_potential_cache(cache_file,cfg,geometry)
-% LOAD_POTENTIAL_CACHE Execute the documented load_potential_cache operation.
+function potentialCache = load_potential_cache(cacheFilename, expectedBaseKey)
+% LOAD_POTENTIAL_CACHE Load a potential cache only after exact key validation.
 %
 % Syntax:
-%   pot_cache = load_potential_cache(cache_file,cfg,geometry)
+%   potentialCache = load_potential_cache(cacheFilename, expectedBaseKey)
 %
 % Inputs:
-%   cache_file      : [char|string] Potential-cache MAT-file path.
-%   cfg             : [struct] Validated CRESTU configuration with SI-valued physical fields.
-%   geometry        : [struct] Concatenated panel geometry for all boundary components.
+%   cacheFilename   - Potential-cache MAT-file path [-].
+%   expectedBaseKey - SHA-256 key for the active case and base geometry [-].
 %
 % Outputs:
-%   pot_cache       : [documented value] Function result; dimensions and units follow the implemented contract.
-%
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
-%
-% ==========================================
-% Function implementation
-% ==========================================
-%LOAD_POTENTIAL_CACHE Load and validate a CRESTU potential cache.
-    if ~exist(cache_file,'file'), error('CRESTU:CacheMissing','Potential cache not found: %s',cache_file); end
-    data=load(cache_file,'pot_cache');
-    if ~isfield(data,'pot_cache'), error('CRESTU:CacheVariable','Cache lacks pot_cache variable: %s',cache_file); end
-    pot_cache=data.pot_cache;
-    required={'schema_version','case_name','omegas','headings','n_body_panels', ...
-        'n_total_panels','environment','geometry_signature','entries'};
-    for k=1:numel(required)
-        if ~isfield(pot_cache,required{k}), error('CRESTU:CacheSchema','Cache lacks %s.',required{k}); end
-    end
-    active_environment=[cfg.water_depth,cfg.grav,cfg.rho,cfg.fs.r_inner,cfg.fs.r_outer, ...
-        cfg.fs.mu0,cfg.isx,cfg.isy];
-    active_signature=geometry_signature(geometry);
-    if pot_cache.schema_version~=4||~strcmp(pot_cache.case_name,cfg.case_name) || ...
-            pot_cache.n_body_panels~=geometry.body_panels || pot_cache.n_total_panels~=geometry.total_panels || ...
-            ~same_array(pot_cache.environment,active_environment) || ...
-            ~same_array(pot_cache.geometry_signature,active_signature) || ...
-            ~same_array(pot_cache.omegas,cfg.freq.omegas) || ...
-            ~same_array(pot_cache.headings,cfg.wave.headings)
-        error('CRESTU:CacheMismatch','Cache metadata do not match the active case/configuration.');
-    end
-end
+%   potentialCache  - Schema-5 potential cache with per-frequency keys [-].
 
-function signature=geometry_signature(g)
-% GEOMETRY_SIGNATURE Execute the documented geometry_signature operation.
-%
-% Syntax:
-%   signature=geometry_signature(g)
-%
-% Inputs:
-%   g               : [scalar] Gravitational acceleration, in m/s^2.
-%
-% Outputs:
-%   signature       : [documented value] Function result; dimensions and units follow the implemented contract.
-%
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
-%
-% ==========================================
-% Function implementation
-% ==========================================
-    signature=[sum(g.centers(:)),sum(g.centers(:).^2),sum(g.normals(:)), ...
-        sum(g.areas(:)),sum(g.vertices(:)),sum(g.vertices(:).^2)];
-end
+    arguments
+        cacheFilename {mustBeTextScalar}
+        expectedBaseKey {mustBeTextScalar}
+    end
 
-function tf=same_array(a,b)
-% SAME_ARRAY Execute the documented same_array operation.
-%
-% Syntax:
-%   tf=same_array(a,b)
-%
-% Inputs:
-%   a               : [documented value] Input required by the implemented function contract.
-%   b               : [documented value] Input required by the implemented function contract.
-%
-% Outputs:
-%   tf              : [documented value] Function result; dimensions and units follow the implemented contract.
-%
-% Mathematical Reference:
-%   See the inline equations and the corresponding CRESTU module theory notes.
-%
-% ==========================================
-% Function implementation
-% ==========================================
-    a=a(:); b=b(:); tf=numel(a)==numel(b)&&all(abs(a-b)<=1e-12*max(1,max(abs([a;b]))));
+    %% 阶段 1: 验证缓存文件与变量结构
+
+    if ~isfile(cacheFilename)
+        fprintf('[CACHE] MISS | file=%s | reason=file_missing\n', ...
+            cacheFilename);
+        error('CRESTU:CacheMissing', ...
+            'Potential cache not found: %s', cacheFilename);
+    end
+
+    loadedData = load(cacheFilename, 'pot_cache');
+
+    if ~isfield(loadedData, 'pot_cache')
+        fprintf('[CACHE] MISS | file=%s | reason=variable_missing\n', ...
+            cacheFilename);
+        error('CRESTU:CacheVariable', ...
+            'Cache lacks pot_cache variable: %s', cacheFilename);
+    end
+
+    potentialCache = loadedData.pot_cache;
+    requiredFields = {'schema_version', 'case_name', 'base_cache_key', ...
+        'code_version', 'entries'};
+
+    for fieldIndex = 1:numel(requiredFields)
+        if ~isfield(potentialCache, requiredFields{fieldIndex})
+            fprintf('[CACHE] MISS | file=%s | reason=schema_field_%s\n', ...
+                cacheFilename, requiredFields{fieldIndex});
+            error('CRESTU:CacheSchema', 'Cache lacks %s.', ...
+                requiredFields{fieldIndex});
+        end
+    end
+
+    %% 阶段 2: 对比完整基础缓存键
+
+    if potentialCache.schema_version ~= 5
+        fprintf('[CACHE] MISS | file=%s | reason=schema_%d\n', ...
+            cacheFilename, potentialCache.schema_version);
+        error('CRESTU:CacheSchema', ...
+            'Potential cache schema %d is obsolete; schema 5 is required.', ...
+            potentialCache.schema_version);
+    end
+
+    if ~strcmp(potentialCache.base_cache_key, char(expectedBaseKey))
+        fprintf('[CACHE] MISS | file=%s | reason=base_key_mismatch\n', ...
+            cacheFilename);
+        error('CRESTU:CacheMismatch', ...
+            'Potential cache base key does not match the active solver state.');
+    end
+
+    fprintf('[CACHE] HIT | file=%s | base_key=%s\n', ...
+        cacheFilename, potentialCache.base_cache_key);
 end

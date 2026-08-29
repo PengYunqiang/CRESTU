@@ -16,15 +16,19 @@ function [indices, matched_omegas, error_value] = match_reference_grid(reference
 %
 % Mathematical Reference:
 %   Nearest-neighbor matching on a one-dimensional monotone frequency grid.
+%% Stage 1: Initialize inputs and dependencies
+
     if nargin < 3 || isempty(tolerance)
         tolerance = 2.0e-4;
     end
+
+%% Stage 2: Run the core calculation
     reference_omegas = reshape(reference_omegas, 1, []);
     target_omegas = reshape(target_omegas, 1, []);
     distance = abs(reference_omegas.' - target_omegas);
     [error_value, indices] = min(distance, [], 1);
     if any(error_value > tolerance)
-        error('CRESTU:ReferenceGrid', 'Reference frequency mismatch exceeds %.3g rad/s.', tolerance);
+        error('CRESTU:ReferenceGrid','Reference frequency mismatch exceeds %.3g rad/s.', tolerance);
     end
     matched_omegas = reference_omegas(indices);
 end

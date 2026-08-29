@@ -1,0 +1,12 @@
+testId,metric,tolerance,currentPass,expectedAfterPass,status,notes
+T2_MIXED_CANONICAL_PRODUCTION_HELPER,5.55111512312578e-17,1e-10,1,1,REPAIRED_PASS,"Production helper maps only FS dGdn by -1; D*1 returns to machine zero."
+T2_COMPONENT_SIGN_CONTRACT,0,0,1,1,REPAIRED_PASS,"Component contract is body +1, FS -1, bottom +1, outer +1."
+T2_HELPER_IN_CODE_FINGERPRINT,0,0,1,1,REPAIRED_PASS,"The production source-orientation helper participates in the solver code hash."
+T3_FS_FINITE_DEPTH_NU,0.121590736629394,1e-10,0,0,UNCHANGED_FAIL,"Unaffected analytic defect must remain currentPass=false after the T2-only repair."
+T5_CYLINDER_STORED_DECAY,0.0283945617138441,1e-08,0,0,UNCHANGED_FAIL,"Unaffected analytic defect must remain currentPass=false after the T2-only repair."
+T5_CYLINDER_GREEN_OUTWARD_SIGN,1.99899337373846,1e-08,0,0,UNCHANGED_FAIL,"Unaffected analytic defect must remain currentPass=false after the T2-only repair."
+T5_FRUSTUM_STORED_PROJECTION,0.177673359877323,1e-08,0,0,UNCHANGED_FAIL,"Unaffected analytic defect must remain currentPass=false after the T2-only repair."
+T5_COMPLEX_KAPPA_INTERFACE,1,0.5,0,0,UNCHANGED_FAIL,"Unaffected analytic defect must remain currentPass=false after the T2-only repair."
+T6_GREEN_RHS_ORIENTATION,2,1e-12,0,0,UNCHANGED_FAIL,"Unaffected analytic defect must remain currentPass=false after the T2-only repair."
+T10_PRESSURE_TRACTION_SIGN,1.99724749958484,0.02,0,0,UNCHANGED_FAIL,"Unaffected analytic defect must remain currentPass=false after the T2-only repair."
+T7_TRANSLATING_SPHERE_ADDED_MASS,1.99724749958484,0.02,0,0,UNCHANGED_FAIL,"Unaffected analytic defect must remain currentPass=false after the T2-only repair."

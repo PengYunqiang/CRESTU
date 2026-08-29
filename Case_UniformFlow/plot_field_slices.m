@@ -1,56 +1,135 @@
-% =========================================================================
-% 2. 经典正交切面可视化函数 (含流线与物面融合)
-% =========================================================================
-function plot_field_slices(X, Y, Z, V, Cp, mesh_body, diameter)
-    fig = figure('Color', 'w', 'Position', [150, 100, 1100, 500], 'Name', 'Flow Field Slices');
-    
-    % (1) Y = 0 纵剖面对称面流场云图
-    subplot(1, 2, 1); hold on; grid on; axis equal;
-    mid_y = round(size(Y, 2) / 2);
-    x_sub = squeeze(X(:, mid_y, :));
-    z_sub = squeeze(Z(:, mid_y, :));
-    mag_sub = squeeze(V.mag(:, mid_y, :));
-    u_sub = squeeze(V.u(:, mid_y, :));
-    w_sub = squeeze(V.w(:, mid_y, :));
-    
-    pcolor(x_sub, z_sub, mag_sub);
+function plot_field_slices(xGrid, yGrid, zGrid, velocityField, pressureCoefficientGrid, bodyMesh, diameter)
+% PLOT_FIELD_SLICES Plot velocity fields on orthogonal planes through a body.
+%
+% Syntax:
+%   plot_field_slices(xGrid, yGrid, zGrid, velocityField, pressureCoefficientGrid, bodyMesh, diameter)
+%
+% Description:
+%   Plots velocity magnitude and streamlines on the y = 0 and z = 0 planes.
+%   The pressure grid and body mesh are checked for interface consistency.
+%
+% Inputs:
+%   xGrid                   - Cartesian x-coordinate grid [m].
+%   yGrid                   - Cartesian y-coordinate grid [m].
+%   zGrid                   - Cartesian z-coordinate grid [m].
+%   velocityField           - Velocity components and magnitude [m/s].
+%   pressureCoefficientGrid - Pressure-coefficient grid [-].
+%   bodyMesh                - Body-panel mesh structure with coordinates [m].
+%   diameter                - Body diameter [m].
+%
+% Outputs:
+%   None.
+%
+% Governing Equations / Theory:
+%   Streamlines follow dx/ds = u and dz/ds = w or dx/ds = u and dy/ds = v.
+%
+% References:
+%   - MATLAB graphics documentation.
+%   - CRESTU theory and technical manual.
+%
+% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+
+    arguments
+        xGrid double
+        yGrid double
+        zGrid double
+        velocityField (1, 1) struct
+        pressureCoefficientGrid double
+        bodyMesh (1, 1) struct
+        diameter (1, 1) double {mustBePositive, mustBeFinite}
+    end
+
+    %% Stage 1: Validate grid and field dimensions
+
+    assert(isequal(size(xGrid), size(yGrid), size(zGrid), ...
+        size(pressureCoefficientGrid)),'CRESTU:FlowSliceGridShape', ...
+'Coordinate and pressure grids must have identical dimensions.');
+    requiredVelocityFields = {'u','v','w','mag'};
+
+    for fieldIndex = 1:numel(requiredVelocityFields)
+        fieldName = requiredVelocityFields{fieldIndex};
+        assert(isfield(velocityField, fieldName) && ...
+            isequal(size(velocityField.(fieldName)), size(xGrid)), ...
+'CRESTU:FlowSliceVelocityShape', ...
+'Velocity field "%s" must match the coordinate grid.', fieldName);
+    end
+
+    assert(isfield(bodyMesh,'centers') && ~isempty(bodyMesh.centers), ...
+'CRESTU:FlowSliceBodyMesh','Body mesh centers are required.');
+
+    figure('Color','w','Position', [150, 100, 1100, 500], ...
+'Name','Flow Field Slices');
+
+    %% Stage 2: Plot the y = 0 longitudinal plane
+
+    subplot(1, 2, 1);
+    hold on;
+    grid on;
+    axis equal;
+
+    middleYIndex = round(size(yGrid, 2) / 2);
+    longitudinalX = squeeze(xGrid(:, middleYIndex, :)); % [m]
+    longitudinalZ = squeeze(zGrid(:, middleYIndex, :)); % [m]
+    longitudinalSpeed = squeeze(velocityField.mag(:, middleYIndex, :)); % [m/s]
+    longitudinalVelocityX = squeeze(velocityField.u(:, middleYIndex, :)); % [m/s]
+    longitudinalVelocityZ = squeeze(velocityField.w(:, middleYIndex, :)); % [m/s]
+
+    pcolor(longitudinalX, longitudinalZ, longitudinalSpeed);
     shading interp;
     colormap(gca, jet);
-    c = colorbar;
-    c.Label.String = '|V| / U_{\infty}';
-    
-    % 叠加流线
-    [sx, sz] = meshgrid(linspace(min(x_sub(:)), min(x_sub(:)), 15), linspace(min(z_sub(:)), max(z_sub(:)), 15));
-    streamline(x_sub', z_sub', u_sub', w_sub', sx, sz);
-    
-    % 绘制球体截面边界
-    th = linspace(0, 2*pi, 100);
-    fill(0.5 * diameter * cos(th), 0.5 * diameter * sin(th), [0.8 0.8 0.8], 'EdgeColor', 'k', 'LineWidth', 1.2);
-    
-    title('Y = 0 纵剖面流速模长云图与流线', 'FontSize', 11, 'FontWeight', 'bold');
-    xlabel('X (m)'); ylabel('Z (m)');
-    xlim([-diameter, diameter]); ylim([-diameter, diameter]);
-    
-    % (2) Z = 0 水平赤道剖面流场云图
-    subplot(1, 2, 2); hold on; grid on; axis equal;
-    mid_z = round(size(Z, 3) / 2);
-    x_sub2 = squeeze(X(:, :, mid_z));
-    y_sub2 = squeeze(Y(:, :, mid_z));
-    mag_sub2 = squeeze(V.mag(:, :, mid_z));
-    u_sub2 = squeeze(V.u(:, :, mid_z));
-    v_sub2 = squeeze(V.v(:, :, mid_z));
-    
-    pcolor(x_sub2, y_sub2, mag_sub2);
+    colorbarHandle = colorbar;
+    colorbarHandle.Label.String ='|V| / U_{\infty}';
+
+    [streamlineStartX, streamlineStartZ] = meshgrid(...
+        min(longitudinalX(:)), ...
+        linspace(min(longitudinalZ(:)), max(longitudinalZ(:)), 15));
+    streamline(longitudinalX', longitudinalZ', longitudinalVelocityX', ...
+        longitudinalVelocityZ', streamlineStartX, streamlineStartZ);
+
+    sectionAngle = linspace(0, 2 * pi, 100); % [rad]
+    fill(0.5 * diameter * cos(sectionAngle), ...
+        0.5 * diameter * sin(sectionAngle), [0.8 0.8 0.8], ...
+'EdgeColor','k','LineWidth', 1.2);
+    title('Y = 0 longitudinal-plane velocity magnitude and streamlines');
+    xlabel('X (m)');
+    ylabel('Z (m)');
+    xlim([-diameter, diameter]);
+    ylim([-diameter, diameter]);
+
+    %% Stage 3: Plot the z = 0 horizontal plane
+
+    subplot(1, 2, 2);
+    hold on;
+    grid on;
+    axis equal;
+
+    middleZIndex = round(size(zGrid, 3) / 2);
+    horizontalX = squeeze(xGrid(:, :, middleZIndex)); % [m]
+    horizontalY = squeeze(yGrid(:, :, middleZIndex)); % [m]
+    horizontalSpeed = squeeze(velocityField.mag(:, :, middleZIndex)); % [m/s]
+    horizontalVelocityX = squeeze(velocityField.u(:, :, middleZIndex)); % [m/s]
+    horizontalVelocityY = squeeze(velocityField.v(:, :, middleZIndex)); % [m/s]
+
+    pcolor(horizontalX, horizontalY, horizontalSpeed);
     shading interp;
     colormap(gca, jet);
-    c2 = colorbar;
-    c2.Label.String = '|V| / U_{\infty}';
-    
-    [sx2, sy2] = meshgrid(linspace(min(x_sub2(:)), min(x_sub2(:)), 15), linspace(min(y_sub2(:)), max(y_sub2(:)), 15));
-    streamline(x_sub2', y_sub2', u_sub2', v_sub2', sx2, sy2);
-    fill(0.5 * diameter * cos(th), 0.5 * diameter * sin(th), [0.8 0.8 0.8], 'EdgeColor', 'k', 'LineWidth', 1.2);
-    
-    title('Z = 0 水平切面流速模长云图与流线', 'FontSize', 11, 'FontWeight', 'bold');
-    xlabel('X (m)'); ylabel('Y (m)');
-    xlim([-diameter, diameter]); ylim([-diameter, diameter]);
+    colorbarHandle = colorbar;
+    colorbarHandle.Label.String ='|V| / U_{\infty}';
+
+    [streamlineStartX, streamlineStartY] = meshgrid(...
+        min(horizontalX(:)), ...
+        linspace(min(horizontalY(:)), max(horizontalY(:)), 15));
+    streamline(horizontalX', horizontalY', horizontalVelocityX', ...
+        horizontalVelocityY', streamlineStartX, streamlineStartY);
+    fill(0.5 * diameter * cos(sectionAngle), ...
+        0.5 * diameter * sin(sectionAngle), [0.8 0.8 0.8], ...
+'EdgeColor','k','LineWidth', 1.2);
+
+    title('Z = 0 horizontal-plane velocity magnitude and streamlines');
+    xlabel('X (m)');
+    ylabel('Y (m)');
+    xlim([-diameter, diameter]);
+    ylim([-diameter, diameter]);
+
+    fprintf('[OK] Flow-field slice plots completed.\n');
 end
