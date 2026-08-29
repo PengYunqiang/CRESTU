@@ -62,6 +62,7 @@ function rao = solve_rao(omegas, added_mass, damping, hydrostatic, excitation, c
     dynamicMatrix = complex(zeros(globalDofCount, globalDofCount, frequencyCount));
     reciprocalCondition = zeros(frequencyCount, 1);
 
+    % <<<CORE>>> solve_frequency_domain_rao, paper_eq=rigid_body_frequency_equation, benchmark=single_sphere_rao
     for k = 1:frequencyCount
         omega = omegas(k); % [rad/s]
         dynamicStiffness = -omega ^ 2 * (M + added_mass(:, :, k)) + ...
@@ -77,6 +78,7 @@ function rao = solve_rao(omegas, added_mass, damping, hydrostatic, excitation, c
 
         complexResponse(:, :, k) = dynamicStiffness \ excitation(:, :, k);
     end
+    % <<</CORE>>>
 
     %% Stage 3: Preserve the response-field contract
 

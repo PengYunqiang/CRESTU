@@ -1,120 +1,560 @@
-function summary = Run_SingleSphere_Convergence(force_recompute)
-% RUN_SINGLESPHERE_CONVERGENCE Run the 16-frequency three-grid hemisphere study.
+function summary = Run_SingleSphere_Convergence(forceRecompute)
+% RUN_SINGLESPHERE_CONVERGENCE Run separated body/outer first-order audits.
 %
 % Syntax:
-%   summary = Run_SingleSphere_Convergence(force_recompute)
+%   summary = Run_SingleSphere_Convergence(forceRecompute)
 %
 % Inputs:
-%   force_recompute : [logical scalar] Ignore compatible result caches when true.
+%   forceRecompute - Recompute all potential solutions when true [-].
 %
 % Outputs:
-%   summary         : [struct] Three CRESTU results, WAMIT references, runtimes, and mesh statistics.
-%
-% Mathematical Reference:
-%   Grid-convergence assessment against WAMIT FullSphereIRR0 and FullSphereIRR3.
-%% Stage 1: Initialize inputs and dependencies
+%   summary        - Forensic audit, convergence studies, and WAMIT checks.
 
-    if nargin < 1
-        force_recompute = false;
+    arguments
+        forceRecompute (1,1) logical = false
     end
 
-%% Stage 2: Run the core calculation
-    [case_directory, ~, wamit_root] = initialize_paths();
-    level_names = {'Coarse','Medium','Fine'};
-    subdirectories = {'Mesh_Coarse','Mesh_Medium','Mesh_Fine'};
-    config_names = {'Case1_Coarse.cfg','Case1_Medium.cfg','Case1_Fine.cfg'};
-    result_set = cell(3, 1);
-    runtime_seconds = zeros(3, 1);
+    %% 阶段 1: 验证目录、依赖和三层物面输入
 
-    for level_index = 1:3
-        config_file = fullfile(case_directory, subdirectories{level_index}, config_names{level_index});
-        cfg = read_config(config_file);
-        timer_id = tic;
-        if ~force_recompute && is_compatible_result(cfg.files.results, cfg)
-            loaded = load(cfg.files.results,'results');
-            result_set{level_index} = loaded.results;
-        else
-            result_set{level_index} = run_frequency_domain_case(config_file);
+    paths = initialize_paths();
+    levelNames = {'Coarse', 'Medium', 'Fine'};
+    bodyMeshFilenames = ensure_body_meshes(paths.caseDirectory, levelNames);
+    [bodyCaseSpecifications, outerCaseSpecifications] = ...
+        build_case_specifications(paths.caseDirectory, levelNames);
+    validate_case_files(bodyCaseSpecifications, outerCaseSpecifications);
+    fprintf('[INFO] Start separated single-sphere first-order convergence audit.\n');
+
+    %% 阶段 2: 求解固定外域的三层真实物面网格
+
+    bodyResults = cell(3, 1);
+    bodyRuntimeSeconds = zeros(3, 1); % [s]
+
+    for levelIndex = 1:2
+        timerIdentifier = tic;
+        bodyResults{levelIndex} = run_with_cache_policy( ...
+            bodyCaseSpecifications(levelIndex), forceRecompute);
+        bodyRuntimeSeconds(levelIndex) = toc(timerIdentifier); % [s]
+    end
+
+    fineTimerIdentifier = tic;
+    fineCleanResult = run_frequency_domain_case( ...
+        bodyCaseSpecifications(3).computeConfig);
+    fineReloadResult = run_frequency_domain_case( ...
+        bodyCaseSpecifications(3).reloadConfig);
+    bodyRuntimeSeconds(3) = toc(fineTimerIdentifier); % [s]
+    fineCacheVerification = compare_clean_and_reload( ...
+        fineCleanResult, fineReloadResult, paths.caseDirectory);
+    cacheKeySensitivity = verify_cache_key_sensitivity( ...
+        fineCleanResult.potential_cache_file, paths.caseDirectory);
+    bodyResults{3} = fineCleanResult;
+
+    %% 阶段 3: 求解固定 Fine 物面的三层 Rankine 外域网格
+
+    outerResults = cell(3, 1);
+    outerRuntimeSeconds = zeros(3, 1); % [s]
+
+    for levelIndex = 1:3
+        timerIdentifier = tic;
+        outerResults{levelIndex} = run_with_cache_policy( ...
+            outerCaseSpecifications(levelIndex), forceRecompute);
+        outerRuntimeSeconds(levelIndex) = toc(timerIdentifier); % [s]
+    end
+
+    %% 阶段 4: 执行几何、互易性、能量和网格收敛核查
+
+    [sphereVerification, sphereDetails] = Verify_Sphere_Meshes( ...
+        bodyMeshFilenames, levelNames, 5.0, paths.caseDirectory); % [m]
+    bodyStudy = Analyze_SingleSphere_Convergence('BodyMesh', 'body', ...
+        levelNames, bodyResults, paths.caseDirectory);
+    outerStudy = Analyze_SingleSphere_Convergence('OuterDomain', 'outer', ...
+        levelNames, outerResults, paths.caseDirectory);
+    firstOrderVerification = build_first_order_verification( ...
+        levelNames, bodyResults, outerResults);
+    firstOrderVerificationFilename = fullfile(paths.caseDirectory, ...
+        'FirstOrder_Verification.csv');
+    writetable(firstOrderVerification, firstOrderVerificationFilename);
+    caseAudit = build_case_audit(levelNames, bodyResults, outerResults);
+    caseAuditFilename = fullfile(paths.caseDirectory, ...
+        'SingleSphere_Case_Audit.csv');
+    writetable(caseAudit, caseAuditFilename);
+
+    %% 阶段 5: 读取 WAMIT 参考并量化未解释偏差
+
+    referenceIrr0 = read_wamit_dataset( ...
+        fullfile(paths.wamitRoot, 'FullSphereIRR0'), 10);
+    referenceIrr3 = read_wamit_dataset( ...
+        fullfile(paths.wamitRoot, 'FullSphereIRR3'), 10);
+    wamitComparison = build_wamit_comparison(outerResults{3}, ...
+        referenceIrr3, paths.caseDirectory);
+
+    %% 阶段 6: 保存总结果并生成数值审计报告
+
+    summary = struct('schema_version', 2, 'levels', {levelNames}, ...
+        'results', {bodyResults}, 'body_results', {bodyResults}, ...
+        'outer_results', {outerResults}, ...
+        'runtime_seconds', bodyRuntimeSeconds, ...
+        'body_runtime_seconds', bodyRuntimeSeconds, ...
+        'outer_runtime_seconds', outerRuntimeSeconds, ...
+        'panel_counts', cellfun(@(item) ...
+        item.stats.total_body_panels, bodyResults), ...
+        'reference_irr0', referenceIrr0, ...
+        'reference_irr3', referenceIrr3, ...
+        'frequency_grid', bodyResults{3}.omegas, ... % [rad/s]
+        'headings', bodyResults{3}.headings, ... % [deg]
+        'body_study', bodyStudy, 'outer_study', outerStudy, ...
+        'sphere_verification', sphereVerification, ...
+        'sphere_details', sphereDetails, ...
+        'fine_cache_verification', fineCacheVerification, ...
+        'cache_key_sensitivity', cacheKeySensitivity, ...
+        'first_order_verification', firstOrderVerification, ...
+        'wamit_comparison', wamitComparison, ...
+        'case_audit', caseAudit, ...
+        'forensic_baseline', legacy_forensic_baseline());
+    summaryFilename = fullfile(paths.caseDirectory, ...
+        'SingleSphere_Convergence_Summary.mat');
+    save(summaryFilename, 'summary', '-v7.3');
+    reportFilename = Write_Numerical_Audit_Report(summary, ...
+        paths.projectDirectory);
+    fprintf('[INFO] First-order verification summary:\n');
+    disp(firstOrderVerification);
+    fprintf('[OK] Single-sphere numerical audit completed: %s\n', ...
+        summaryFilename);
+    fprintf('[OK] Numerical audit report generated: %s\n', reportFilename);
+end
+
+function sensitivityTable = verify_cache_key_sensitivity( ...
+        cacheFilename, outputDirectory)
+% VERIFY_CACHE_KEY_SENSITIVITY Require every mandated field to change the key.
+
+    %% 阶段 1: 读取一个真实 Fine 逐频率缓存清单
+
+    loadedCache = load(cacheFilename, 'pot_cache');
+    assert(isfield(loadedCache, 'pot_cache') && ...
+        loadedCache.pot_cache.schema_version == 5, ...
+        'CRESTU:CacheSensitivitySchema', ...
+        'Fine cache must use schema 5 for sensitivity verification.');
+    cacheEntry = loadedCache.pot_cache.entries(1);
+    baselineSpecification = cacheEntry.cache_specification;
+    baselineKey = cacheEntry.cache_key;
+    fieldNames = {'bodyMeshHash', 'freeSurfaceMeshHash', ...
+        'bottomMeshHash', 'outerBoundaryMeshHash', 'frequency', ...
+        'headings', 'globalDofCount', 'problemType', ...
+        'solverOptions', 'codeVersion'};
+    changedKey = strings(numel(fieldNames), 1);
+    cacheMissRequired = false(numel(fieldNames), 1);
+
+    %% 阶段 2: 独立扰动每个强制字段并重新计算键
+
+    for fieldIndex = 1:numel(fieldNames)
+        modifiedSpecification = baselineSpecification;
+        modifiedSpecification = perturb_cache_field( ...
+            modifiedSpecification, fieldNames{fieldIndex});
+        changedKey(fieldIndex) = sha256_hash( ...
+            jsonencode(modifiedSpecification));
+        cacheMissRequired(fieldIndex) = ...
+            changedKey(fieldIndex) ~= string(baselineKey);
+    end
+
+    sensitivityTable = table(string(fieldNames(:)), ...
+        repmat(string(baselineKey), numel(fieldNames), 1), ...
+        changedKey, cacheMissRequired, 'VariableNames', ...
+        {'changedField', 'baselineKey', 'changedKey', ...
+        'cacheMissRequired'});
+    assert(all(cacheMissRequired), 'CRESTU:CacheSensitivityFailure', ...
+        'At least one mandatory cache field did not change the key.');
+    sensitivityFilename = fullfile(outputDirectory, ...
+        'Cache_Key_Sensitivity.csv');
+    writetable(sensitivityTable, sensitivityFilename);
+    fprintf('[OK] Mandatory cache-key sensitivity verified: %s\n', ...
+        sensitivityFilename);
+end
+
+function specification = perturb_cache_field(specification, fieldName)
+% PERTURB_CACHE_FIELD Apply one deterministic, physically meaningful change.
+
+    switch fieldName
+        case {'bodyMeshHash', 'freeSurfaceMeshHash', 'bottomMeshHash', ...
+                'outerBoundaryMeshHash', 'codeVersion'}
+            specification.(fieldName) = [specification.(fieldName), 'x'];
+
+        case 'frequency'
+            specification.frequency = specification.frequency + 1.0e-6; % [rad/s]
+
+        case 'headings'
+            specification.headings(1) = specification.headings(1) + 1.0e-6; % [deg]
+
+        case 'globalDofCount'
+            specification.globalDofCount = specification.globalDofCount + 6;
+
+        case 'problemType'
+            specification.problemType = [specification.problemType, ';test-change'];
+
+        case 'solverOptions'
+            specification.solverOptions.gravity = ...
+                specification.solverOptions.gravity * (1.0 + 1.0e-9); % [m/s^2]
+
+        otherwise
+            error('CRESTU:CacheSensitivityField', ...
+                'Unsupported cache sensitivity field: %s', fieldName);
+    end
+end
+
+function paths = initialize_paths()
+% INITIALIZE_PATHS Resolve source, case, and read-only WAMIT directories.
+
+    %% 阶段 1: 定位工程目录
+
+    caseDirectory = fileparts(mfilename('fullpath'));
+    caseWaveDirectory = fileparts(caseDirectory);
+    projectDirectory = fileparts(caseWaveDirectory);
+    sourceDirectory = fullfile(projectDirectory, 'Source Code');
+    versionDirectory = fileparts(fileparts(projectDirectory));
+    wamitRoot = fullfile(versionDirectory, 'WAMIT');
+    requiredDirectories = {sourceDirectory, caseWaveDirectory, wamitRoot};
+
+    for directoryIndex = 1:numel(requiredDirectories)
+        assert(isfolder(requiredDirectories{directoryIndex}), ...
+            'CRESTU:AuditDirectoryMissing', ...
+            'Required audit directory was not found: %s', ...
+            requiredDirectories{directoryIndex});
+    end
+
+    %% 阶段 2: 加载实际源码目录
+
+    addpath(fullfile(sourceDirectory, '0.Tools Code'), ...
+        fullfile(sourceDirectory, '1.Input'), ...
+        fullfile(sourceDirectory, '2.Mesh'), ...
+        fullfile(sourceDirectory, '3.HessSmith'), ...
+        fullfile(sourceDirectory, '4.Potential'), ...
+        fullfile(sourceDirectory, '5.Force'), ...
+        fullfile(sourceDirectory, '6.MeanDriftLoads'), ...
+        caseWaveDirectory, fullfile(caseWaveDirectory, 'Common_Scripts'), ...
+        caseDirectory);
+    paths = struct('caseDirectory', caseDirectory, ...
+        'caseWaveDirectory', caseWaveDirectory, ...
+        'projectDirectory', projectDirectory, ...
+        'sourceDirectory', sourceDirectory, 'wamitRoot', wamitRoot);
+end
+
+function meshFilenames = ensure_body_meshes(caseDirectory, levelNames)
+% ENSURE_BODY_MESHES Enforce 3/5/7 cube-face divisions for the sphere meshes.
+
+    subdirectories = {'Mesh_Coarse', 'Mesh_Medium', 'Mesh_Fine'};
+    meshNames = {'hemi_D10_coarse_body.bmf', ...
+        'hemi_D10_medium_body.bmf', 'hemi_D10_fine_body.bmf'};
+    divisionCounts = [3, 5, 7];
+    expectedPanelCounts = 12 * divisionCounts.^2;
+    meshFilenames = cell(3, 1);
+    characteristicSizes = zeros(3, 1); % [m]
+
+    for levelIndex = 1:3
+        meshFilenames{levelIndex} = fullfile(caseDirectory, ...
+            subdirectories{levelIndex}, meshNames{levelIndex});
+        regenerateMesh = ~isfile(meshFilenames{levelIndex});
+
+        if ~regenerateMesh
+            mesh = read_bmf(meshFilenames{levelIndex});
+            regenerateMesh = mesh.n_panels ~= expectedPanelCounts(levelIndex);
         end
-        runtime_seconds(level_index) = toc(timer_id);
+
+        if regenerateMesh
+            fprintf('[WARN] Regenerate %s body mesh with %d divisions.\n', ...
+                levelNames{levelIndex}, divisionCounts(levelIndex));
+            mesh = generate_body_bmf(meshFilenames{levelIndex}, 10.0, ...
+                0, 0, divisionCounts(levelIndex)); % [m]
+        end
+
+        meshAudit = mesh_fingerprint(mesh);
+        characteristicSizes(levelIndex) = meshAudit.characteristicSize; % [m]
+        assert(meshAudit.panelCount == expectedPanelCounts(levelIndex), ...
+            'CRESTU:BodyMeshPanelCount', ...
+            '%s body mesh has %d panels; expected %d.', ...
+            levelNames{levelIndex}, meshAudit.panelCount, ...
+            expectedPanelCounts(levelIndex));
+        fprintf('[AUDIT] %s body mesh | panels=%d vertices=%d h=%.6g m hash=%s\n', ...
+            levelNames{levelIndex}, meshAudit.panelCount, ...
+            meshAudit.vertexCount, meshAudit.characteristicSize, ...
+            meshAudit.hash);
     end
 
-    reference_irr0 = read_wamit_dataset(fullfile(wamit_root,'FullSphereIRR0'), 10);
-    reference_irr3 = read_wamit_dataset(fullfile(wamit_root,'FullSphereIRR3'), 10);
-    panel_counts = cellfun(@(item) item.stats.total_dofs, result_set);
-    summary = struct('schema_version', 1,'levels', {level_names},'results', {result_set}, ...
-'runtime_seconds', runtime_seconds,'panel_counts', panel_counts, ...
-'reference_irr0', reference_irr0,'reference_irr3', reference_irr3, ...
-'frequency_grid', 0.5:0.1:2.0,'headings', [0, 45, 90]);
-    summary_file = fullfile(case_directory,'SingleSphere_Convergence_Summary.mat');
-    save(summary_file,'summary','-v7.3');
-    Plot_SingleBody_Results(summary_file);
-    Plot_MeanDrift_Comparison(summary_file);
-    fprintf('[OK] Single-sphere convergence suite completed: %s\n', summary_file);
+    assert(all(diff(expectedPanelCounts) > 0) && ...
+        all(diff(characteristicSizes) < 0), ...
+        'CRESTU:BodyMeshRefinement', ...
+        'Body panel count must increase and characteristic size must decrease.');
 end
 
-function [case_directory, code_root, wamit_root] = initialize_paths()
-% INITIALIZE_PATHS Add CRESTU modules and resolve the read-only benchmark root.
-%
-% Syntax:
-%   [case_directory, code_root, wamit_root] = initialize_paths()
-%
-% Inputs:
-%   None.
-%
-% Outputs:
-%   case_directory : [char] Directory containing this convergence suite.
-%   code_root      : [char] CRESTU Code directory.
-%   wamit_root     : [char] Read-only sibling WAMIT directory.
-%
-% Mathematical Reference:
-%   Path utility; no mathematical model is used.
-%% Stage 1: Initialize inputs and dependencies
+function [bodySpecifications, outerSpecifications] = ...
+        build_case_specifications(caseDirectory, levelNames)
+% BUILD_CASE_SPECIFICATIONS Define compute/reload configurations for both studies.
 
-    case_directory = fileparts(mfilename('fullpath'));
+    bodySubdirectories = {'Mesh_Coarse', 'Mesh_Medium', 'Mesh_Fine'};
+    bodyComputeNames = {'Case1_Coarse.cfg', 'Case1_Medium.cfg', ...
+        'Case1_Fine.cfg'};
+    bodyReloadNames = {'Case1_Coarse_PostProcess.cfg', ...
+        'Case1_Medium_PostProcess.cfg', 'Case1_Fine_PostProcess.cfg'};
+    outerRoot = fullfile(caseDirectory, 'OuterDomain_Convergence');
+    outerComputeNames = {'Case1_Outer_Coarse.cfg', ...
+        'Case1_Outer_Medium.cfg', 'Case1_Outer_Fine.cfg'};
+    outerReloadNames = {'Case1_Outer_Coarse_PostProcess.cfg', ...
+        'Case1_Outer_Medium_PostProcess.cfg', ...
+        'Case1_Outer_Fine_PostProcess.cfg'};
+    emptySpecification = struct('level', '', 'computeConfig', '', ...
+        'reloadConfig', '');
+    bodySpecifications = repmat(emptySpecification, 3, 1);
+    outerSpecifications = repmat(emptySpecification, 3, 1);
 
-%% Stage 2: Run the core calculation
-
-    case_wave_directory = fileparts(case_directory);
-    code_root = fileparts(case_wave_directory);
-    wamit_root = fullfile(fileparts(code_root),'WAMIT');
-    addpath(fullfile(code_root,'1.Input'), fullfile(code_root,'2.Mesh'), ...
-        fullfile(code_root,'3.HessSmith'), fullfile(code_root,'4.Potential'), ...
-        fullfile(code_root,'5.Force'), fullfile(code_root,'6.MeanDriftLoads'), ...
-        case_wave_directory, fullfile(case_wave_directory,'Common_Scripts'));
+    for levelIndex = 1:3
+        bodySpecifications(levelIndex) = struct( ...
+            'level', levelNames{levelIndex}, ...
+            'computeConfig', fullfile(caseDirectory, ...
+            bodySubdirectories{levelIndex}, bodyComputeNames{levelIndex}), ...
+            'reloadConfig', fullfile(caseDirectory, ...
+            bodySubdirectories{levelIndex}, bodyReloadNames{levelIndex}));
+        outerSpecifications(levelIndex) = struct( ...
+            'level', levelNames{levelIndex}, ...
+            'computeConfig', fullfile(outerRoot, ...
+            bodySubdirectories{levelIndex}, outerComputeNames{levelIndex}), ...
+            'reloadConfig', fullfile(outerRoot, ...
+            bodySubdirectories{levelIndex}, outerReloadNames{levelIndex}));
+    end
 end
 
-function compatible = is_compatible_result(filename, cfg)
-% IS_COMPATIBLE_RESULT Check whether a saved result matches the requested grid.
-%
-% Syntax:
-%   compatible = is_compatible_result(filename, cfg)
-%
-% Inputs:
-%   filename : [char] Result MAT-file path.
-%   cfg      : [struct] Requested configuration.
-%
-% Outputs:
-%   compatible : [logical scalar] True for a reusable result.
-%
-% Mathematical Reference:
-%   Exact metadata validation with floating-point tolerance.
-%% Stage 1: Initialize inputs and dependencies
+function validate_case_files(bodySpecifications, outerSpecifications)
+% VALIDATE_CASE_FILES Fail early if any compute/reload configuration is absent.
 
-    compatible = false;
-    if ~isfile(filename)
+    specifications = [bodySpecifications; outerSpecifications];
+
+    for caseIndex = 1:numel(specifications)
+        assert(isfile(specifications(caseIndex).computeConfig), ...
+            'CRESTU:AuditConfigMissing', ...
+            'Compute configuration was not found: %s', ...
+            specifications(caseIndex).computeConfig);
+        assert(isfile(specifications(caseIndex).reloadConfig), ...
+            'CRESTU:AuditConfigMissing', ...
+            'Reload configuration was not found: %s', ...
+            specifications(caseIndex).reloadConfig);
+    end
+end
+
+function result = run_with_cache_policy(caseSpecification, forceRecompute)
+% RUN_WITH_CACHE_POLICY Reuse only a cache that passes exact key validation.
+
+    if forceRecompute
+        result = run_frequency_domain_case(caseSpecification.computeConfig);
         return
     end
 
-%% Stage 2: Run the core calculation
+    try
+        result = run_frequency_domain_case(caseSpecification.reloadConfig);
+    catch exception
+        recoverableIdentifiers = {'CRESTU:CacheMissing', ...
+            'CRESTU:CacheVariable', 'CRESTU:CacheSchema', ...
+            'CRESTU:CacheMismatch'};
 
-    loaded = load(filename,'results');
-    if ~isfield(loaded,'results') || ~isfield(loaded.results,'schema_version')
-        return
+        if ~ismember(exception.identifier, recoverableIdentifiers)
+            rethrow(exception)
+        end
+
+        fprintf('[CACHE] Recompute %s after validated miss: %s\n', ...
+            caseSpecification.level, exception.message);
+        result = run_frequency_domain_case(caseSpecification.computeConfig);
     end
-    compatible = loaded.results.schema_version >= 5 ...
- && isequal(size(loaded.results.omegas), size(cfg.freq.omegas)) ...
- && max(abs(loaded.results.omegas - cfg.freq.omegas)) < 1.0e-12 ...
- && isequal(loaded.results.headings, cfg.wave.headings) ...
- && isfield(loaded.results,'drift') && loaded.results.drift.enabled;
+end
+
+function comparisonTable = compare_clean_and_reload( ...
+        cleanResult, reloadResult, outputDirectory)
+% COMPARE_CLEAN_AND_RELOAD Require machine-precision cache reproducibility.
+
+    fieldNames = {'A_raw', 'B_raw', 'A_reciprocal', 'B_reciprocal', ...
+        'damping_energy', 'excitation'};
+    comparisonNames = [fieldNames, {'rao_complex'}];
+    maximumAbsoluteDifference = zeros(numel(comparisonNames), 1);
+    machineTolerance = zeros(numel(comparisonNames), 1);
+    withinMachinePrecision = false(numel(comparisonNames), 1);
+
+    for fieldIndex = 1:numel(fieldNames)
+        [maximumAbsoluteDifference(fieldIndex), machineTolerance(fieldIndex)] = ...
+            compare_numeric_arrays(cleanResult.(fieldNames{fieldIndex}), ...
+            reloadResult.(fieldNames{fieldIndex}));
+        withinMachinePrecision(fieldIndex) = ...
+            maximumAbsoluteDifference(fieldIndex) <= machineTolerance(fieldIndex);
+    end
+
+    finalIndex = numel(comparisonNames);
+    [maximumAbsoluteDifference(finalIndex), machineTolerance(finalIndex)] = ...
+        compare_numeric_arrays(cleanResult.rao.complex, ...
+        reloadResult.rao.complex);
+    withinMachinePrecision(finalIndex) = ...
+        maximumAbsoluteDifference(finalIndex) <= machineTolerance(finalIndex);
+    comparisonTable = table(string(comparisonNames(:)), ...
+        maximumAbsoluteDifference, machineTolerance, withinMachinePrecision, ...
+        'VariableNames', {'field', 'maximumAbsoluteDifference', ...
+        'machineTolerance', 'withinMachinePrecision'});
+    comparisonFilename = fullfile(outputDirectory, ...
+        'Fine_Cache_Clean_Reload_Verification.csv');
+    writetable(comparisonTable, comparisonFilename);
+    disp(comparisonTable);
+    assert(all(withinMachinePrecision), 'CRESTU:CacheReloadPrecision', ...
+        'Fine clean recompute and cache reload differ beyond machine precision.');
+    fprintf('[OK] Fine clean/cache reload agrees to machine precision: %s\n', ...
+        comparisonFilename);
+end
+
+function [maximumDifference, tolerance] = compare_numeric_arrays( ...
+        firstArray, secondArray)
+% COMPARE_NUMERIC_ARRAYS Return maximum absolute difference and EPS tolerance.
+
+    assert(isequal(size(firstArray), size(secondArray)), ...
+        'CRESTU:CacheReloadShape', ...
+        'Clean and reload arrays have different dimensions.');
+    maximumDifference = max(abs(firstArray(:) - secondArray(:)));
+    valueScale = max([1.0; abs(firstArray(:)); abs(secondArray(:))]);
+    tolerance = 64.0 * eps(valueScale);
+end
+
+function verificationTable = build_first_order_verification( ...
+        levelNames, bodyResults, outerResults)
+% BUILD_FIRST_ORDER_VERIFICATION Export reciprocity, energy, and solve residuals.
+
+    resultGroups = {'BodyMesh', 'OuterDomain'};
+    groupedResults = {bodyResults, outerResults};
+    rowCount = 2 * 3 * numel(bodyResults{1}.omegas);
+    study = strings(rowCount, 1);
+    level = strings(rowCount, 1);
+    omega = zeros(rowCount, 1); % [rad/s]
+    rawAReciprocityResidual = zeros(rowCount, 1);
+    rawBReciprocityResidual = zeros(rowCount, 1);
+    pressureEnergyMatrixResidual = zeros(rowCount, 1);
+    pressureEnergyB33Residual = zeros(rowCount, 1);
+    maxRadiationLinearResidual = zeros(rowCount, 1);
+    maxDiffractionLinearResidual = zeros(rowCount, 1);
+    rowIndex = 0;
+
+    for groupIndex = 1:2
+        results = groupedResults{groupIndex};
+
+        for levelIndex = 1:3
+            result = results{levelIndex};
+
+            for frequencyIndex = 1:numel(result.omegas)
+                rowIndex = rowIndex + 1;
+                study(rowIndex) = resultGroups{groupIndex};
+                level(rowIndex) = levelNames{levelIndex};
+                omega(rowIndex) = result.omegas(frequencyIndex);
+                rawAReciprocityResidual(rowIndex) = result.diagnostics( ...
+                    frequencyIndex).raw_added_mass_symmetry_error;
+                rawBReciprocityResidual(rowIndex) = result.diagnostics( ...
+                    frequencyIndex).raw_damping_symmetry_error;
+                pressureEnergyMatrixResidual(rowIndex) = result.diagnostics( ...
+                    frequencyIndex).pressure_energy_relative_residual;
+                pressureEnergyB33Residual(rowIndex) = result.diagnostics( ...
+                    frequencyIndex).B33_pressure_energy_relative_residual;
+                maxRadiationLinearResidual(rowIndex) = ...
+                    result.audit.frequencyEntries( ...
+                    frequencyIndex).maxRadiationLinearResidual;
+                maxDiffractionLinearResidual(rowIndex) = ...
+                    result.audit.frequencyEntries( ...
+                    frequencyIndex).maxDiffractionLinearResidual;
+            end
+        end
+    end
+
+    verificationTable = table(study, level, omega, ...
+        rawAReciprocityResidual, rawBReciprocityResidual, ...
+        pressureEnergyMatrixResidual, pressureEnergyB33Residual, ...
+        maxRadiationLinearResidual, maxDiffractionLinearResidual, ...
+        'VariableNames', {'study', 'level', 'omegaRadPerSecond', ...
+        'rawAReciprocityResidual', 'rawBReciprocityResidual', ...
+        'pressureEnergyMatrixResidual', 'pressureEnergyB33Residual', ...
+        'maxRadiationLinearResidual', 'maxDiffractionLinearResidual'});
+end
+
+function auditTable = build_case_audit(levelNames, bodyResults, outerResults)
+% BUILD_CASE_AUDIT Concatenate the actual per-frequency audit of all six cases.
+
+    studyNames = {'BodyMesh', 'OuterDomain'};
+    groupedResults = {bodyResults, outerResults};
+    tables = cell(6, 1);
+    tableIndex = 0;
+
+    for studyIndex = 1:2
+        for levelIndex = 1:3
+            tableIndex = tableIndex + 1;
+            resultTable = struct2table(groupedResults{studyIndex}{ ...
+                levelIndex}.audit.frequencyEntries);
+            resultTable = addvars(resultTable, ...
+                repmat(string(studyNames{studyIndex}), height(resultTable), 1), ...
+                repmat(string(levelNames{levelIndex}), height(resultTable), 1), ...
+                'Before', 1, 'NewVariableNames', {'study', 'level'});
+            tables{tableIndex} = resultTable;
+        end
+    end
+
+    auditTable = vertcat(tables{:});
+end
+
+function comparisonTable = build_wamit_comparison(bestResult, ...
+        reference, outputDirectory)
+% BUILD_WAMIT_COMPARISON Quantify discrepancies without scaling either dataset.
+
+    omega = reshape(bestResult.omegas, [], 1); % [rad/s]
+    radiationIndex = match_reference_grid(reference.radiation.omegas, omega);
+    headingIndex = find(abs(bestResult.headings) < 1.0e-12, 1);
+    referenceHeadingIndex = find(abs(reference.excitation.headings) < ...
+        1.0e-12, 1);
+    referenceRaoHeadingIndex = find(abs(reference.rao.headings) < ...
+        1.0e-12, 1);
+    A33 = squeeze(bestResult.added_mass(3, 3, :)); % [kg]
+    B33 = squeeze(bestResult.damping(3, 3, :)); % [kg/s]
+    F3 = squeeze(abs(bestResult.excitation(3, headingIndex, :))); % [N]
+    RAO3 = squeeze(bestResult.rao.amplitude(3, headingIndex, :)); % [m/m]
+    wamitA33 = squeeze(reference.radiation.added_mass( ...
+        3, 3, radiationIndex)); % [kg]
+    wamitB33 = squeeze(reference.radiation.damping( ...
+        3, 3, radiationIndex)); % [kg/s]
+    excitationIndex = match_reference_grid(reference.excitation.omegas, omega);
+    raoIndex = match_reference_grid(reference.rao.omegas, omega);
+    wamitF3 = squeeze(abs(reference.excitation.force( ...
+        3, referenceHeadingIndex, excitationIndex))); % [N]
+    wamitRAO3 = squeeze(reference.rao.amplitude( ...
+        3, referenceRaoHeadingIndex, raoIndex)); % [m/m]
+    A33RelativeError = relative_error(A33, wamitA33);
+    B33RelativeError = relative_error(B33, wamitB33);
+    F3RelativeError = relative_error(F3, wamitF3);
+    RAO3RelativeError = relative_error(RAO3, wamitRAO3);
+    highFrequency = omega >= 1.5; % [rad/s]
+    comparisonTable = table(omega, A33, wamitA33, A33RelativeError, ...
+        B33, wamitB33, B33RelativeError, F3, wamitF3, F3RelativeError, ...
+        RAO3, wamitRAO3, RAO3RelativeError, highFrequency, ...
+        'VariableNames', {'omegaRadPerSecond', 'CRESTU_A33', 'WAMIT_A33', ...
+        'A33RelativeError', 'CRESTU_B33', 'WAMIT_B33', ...
+        'B33RelativeError', 'CRESTU_F3', 'WAMIT_F3', ...
+        'F3RelativeError', 'CRESTU_RAO3', 'WAMIT_RAO3', ...
+        'RAO3RelativeError', 'highFrequency'});
+    comparisonFilename = fullfile(outputDirectory, ...
+        'Fine_FirstOrder_WAMIT_Comparison.csv');
+    writetable(comparisonTable, comparisonFilename);
+    fprintf('[OK] Unscaled Fine/WAMIT comparison saved: %s\n', ...
+        comparisonFilename);
+end
+
+function relativeError = relative_error(computedValue, referenceValue)
+% RELATIVE_ERROR Compute absolute relative error with a safe zero reference.
+
+    relativeError = abs(computedValue - referenceValue) ./ ...
+        max(abs(referenceValue), eps);
+end
+
+function baseline = legacy_forensic_baseline()
+% LEGACY_FORENSIC_BASELINE Preserve the pre-fix evidence invalidating old conclusions.
+
+    baseline = struct('bodyPanelCounts', [108, 300, 588], ...
+        'freeSurfacePanelCounts', [120, 400, 1064], ...
+        'bottomPanelCounts', [228, 700, 1652], ...
+        'outerBoundaryPanelCounts', [72, 120, 168], ...
+        'bemUnknownCounts', [528, 1520, 3472], ...
+        'cacheSchema', 4, ...
+        'resultReuseCheckedMesh', false, ...
+        'finding', ['Body meshes differed, but every outer boundary also ', ...
+        'changed; the previous study was not a body-mesh convergence test.']);
 end

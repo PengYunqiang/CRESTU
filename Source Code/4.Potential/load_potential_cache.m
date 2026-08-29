@@ -1,117 +1,69 @@
-function pot_cache = load_potential_cache(cache_file, cfg, geometry)
-% LOAD_POTENTIAL_CACHE Load potential cache for the CRESTU hydrodynamic workflow.
+function potentialCache = load_potential_cache(cacheFilename, expectedBaseKey)
+% LOAD_POTENTIAL_CACHE Load a potential cache only after exact key validation.
 %
 % Syntax:
-%   pot_cache = load_potential_cache(cache_file, cfg, geometry)
-%
-% Description:
-%   Implements linear Rankine potential-flow operations.
-%   Symmetry and phase follow exp(i*omega*t).
+%   potentialCache = load_potential_cache(cacheFilename, expectedBaseKey)
 %
 % Inputs:
-%   cache_file         - [character vector or string scalar] Potential-cache file path.
-%   cfg                - [struct] Validated CRESTU configuration containing SI-valued physical and numerical parameters.
-%   geometry           - [struct] Merged boundary geometry with coordinates in [m] and areas in [m^2].
+%   cacheFilename   - Potential-cache MAT-file path [-].
+%   expectedBaseKey - SHA-256 key for the active case and base geometry [-].
 %
 % Outputs:
-%   pot_cache          - [struct] Validated cached potential solution and geometry signature.
-%
-% Governing Equations / Theory:
-%   Green third identity, the Rankine kernel 1/r, linearized free-surface theory, and reflection symmetry as applicable.
-%
-% References:
-%   - Newman, J. N. (1977), Marine Hydrodynamics; Hess and Smith (1964); project boundary-condition specification.
-%
-% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+%   potentialCache  - Schema-5 potential cache with per-frequency keys [-].
 
-%% Stage 1: Validate Inputs and Initialize the Algorithm
+    arguments
+        cacheFilename {mustBeTextScalar}
+        expectedBaseKey {mustBeTextScalar}
+    end
 
-    if ~exist(cache_file,'file')
-        error('CRESTU:CacheMissing','Potential cache not found: %s', cache_file);
+    %% 阶段 1: 验证缓存文件与变量结构
+
+    if ~isfile(cacheFilename)
+        fprintf('[CACHE] MISS | file=%s | reason=file_missing\n', ...
+            cacheFilename);
+        error('CRESTU:CacheMissing', ...
+            'Potential cache not found: %s', cacheFilename);
     end
-    data = load(cache_file,'pot_cache');
-    if ~isfield(data,'pot_cache')
-        error('CRESTU:CacheVariable','Cache lacks pot_cache variable: %s', cache_file);
+
+    loadedData = load(cacheFilename, 'pot_cache');
+
+    if ~isfield(loadedData, 'pot_cache')
+        fprintf('[CACHE] MISS | file=%s | reason=variable_missing\n', ...
+            cacheFilename);
+        error('CRESTU:CacheVariable', ...
+            'Cache lacks pot_cache variable: %s', cacheFilename);
     end
-    pot_cache = data.pot_cache;
-    required = {'schema_version','case_name','omegas','headings','n_body_panels', ...
-'n_total_panels','environment','geometry_signature','entries'};
-    for k = 1:numel(required)
-        if ~isfield(pot_cache, required{k})
-            error('CRESTU:CacheSchema','Cache lacks %s.', required{k});
+
+    potentialCache = loadedData.pot_cache;
+    requiredFields = {'schema_version', 'case_name', 'base_cache_key', ...
+        'code_version', 'entries'};
+
+    for fieldIndex = 1:numel(requiredFields)
+        if ~isfield(potentialCache, requiredFields{fieldIndex})
+            fprintf('[CACHE] MISS | file=%s | reason=schema_field_%s\n', ...
+                cacheFilename, requiredFields{fieldIndex});
+            error('CRESTU:CacheSchema', 'Cache lacks %s.', ...
+                requiredFields{fieldIndex});
         end
     end
-    active_environment = [cfg.water_depth, cfg.grav, cfg.rho, cfg.fs.r_inner, cfg.fs.r_outer, ...
-        cfg.fs.mu0, cfg.isx, cfg.isy];
-    active_signature = geometry_signature(geometry);
-    if pot_cache.schema_version ~= 4 || ~strcmp(pot_cache.case_name, cfg.case_name) || ...
-            pot_cache.n_body_panels ~= geometry.body_panels || pot_cache.n_total_panels ~= geometry.total_panels || ...
-            ~same_array(pot_cache.environment, active_environment) || ...
-            ~same_array(pot_cache.geometry_signature, active_signature) || ...
-            ~same_array(pot_cache.omegas, cfg.freq.omegas) || ...
-            ~same_array(pot_cache.headings, cfg.wave.headings)
-        error('CRESTU:CacheMismatch','Cache metadata do not match the active case/configuration.');
+
+    %% 阶段 2: 对比完整基础缓存键
+
+    if potentialCache.schema_version ~= 5
+        fprintf('[CACHE] MISS | file=%s | reason=schema_%d\n', ...
+            cacheFilename, potentialCache.schema_version);
+        error('CRESTU:CacheSchema', ...
+            'Potential cache schema %d is obsolete; schema 5 is required.', ...
+            potentialCache.schema_version);
     end
-end
 
-function signature = geometry_signature(g)
-% GEOMETRY_SIGNATURE Construct a deterministic geometry signature for cache validation.
-%
-% Syntax:
-%   signature = geometry_signature(g)
-%
-% Description:
-%   Implements linear Rankine potential-flow operations.
-%   Symmetry and phase follow exp(i*omega*t).
-%
-% Inputs:
-%   g                  - [scalar] Gravitational acceleration, [m/s^2].
-%
-% Outputs:
-%   signature          - [struct] Deterministic geometry counts, coordinates, and area signature in SI units.
-%
-% Governing Equations / Theory:
-%   Green third identity, the Rankine kernel 1/r, linearized free-surface theory, and reflection symmetry as applicable.
-%
-% References:
-%   - Newman, J. N. (1977), Marine Hydrodynamics; Hess and Smith (1964); project boundary-condition specification.
-%
-% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
+    if ~strcmp(potentialCache.base_cache_key, char(expectedBaseKey))
+        fprintf('[CACHE] MISS | file=%s | reason=base_key_mismatch\n', ...
+            cacheFilename);
+        error('CRESTU:CacheMismatch', ...
+            'Potential cache base key does not match the active solver state.');
+    end
 
-%% Stage 1: Validate Inputs and Initialize the Algorithm
-
-    signature = [sum(g.centers(:)), sum(g.centers(:) .^ 2), sum(g.normals(:)), ...
-        sum(g.areas(:)), sum(g.vertices(:)), sum(g.vertices(:) .^ 2)];
-end
-
-function tf = same_array(a, actualSignature)
-% SAME_ARRAY Compare two numeric arrays using a scale-aware tolerance.
-%
-% Syntax:
-%   tf = same_array(a, actualSignature)
-%
-% Description:
-%   Implements linear Rankine potential-flow operations.
-%   Symmetry and phase follow exp(i*omega*t).
-%
-% Inputs:
-%   a                  - First vector or scalar operand; dimensions and SI units follow the stated algorithm.
-%   actualSignature                  - Second vector or scalar operand; dimensions and SI units follow the stated algorithm.
-%
-% Outputs:
-%   tf                 - [logical scalar] True when the tested condition is satisfied.
-%
-% Governing Equations / Theory:
-%   Green third identity, the Rankine kernel 1/r, linearized free-surface theory, and reflection symmetry as applicable.
-%
-% References:
-%   - Newman, J. N. (1977), Marine Hydrodynamics; Hess and Smith (1964); project boundary-condition specification.
-%
-% Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
-
-%% Stage 1: Validate Inputs and Initialize the Algorithm
-
-    a = a(:);
-    actualSignature = actualSignature(:);
-    tf = numel(a) == numel(actualSignature) && all(abs(a - actualSignature) <= 1e-12 * max(1, max(abs([a;actualSignature]))));
+    fprintf('[CACHE] HIT | file=%s | base_key=%s\n', ...
+        cacheFilename, potentialCache.base_cache_key);
 end

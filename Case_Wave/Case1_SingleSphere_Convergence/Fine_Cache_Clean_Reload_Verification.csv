@@ -1,0 +1,8 @@
+field,maximumAbsoluteDifference,machineTolerance,withinMachinePrecision
+A_raw,0,1.86264514923096e-09,1
+B_raw,0,3.72529029846191e-09,1
+A_reciprocal,0,1.86264514923096e-09,1
+B_reciprocal,0,3.72529029846191e-09,1
+damping_energy,0,3.72529029846191e-09,1
+excitation,0,7.45058059692383e-09,1
+rao_complex,0,9.09494701772928e-13,1

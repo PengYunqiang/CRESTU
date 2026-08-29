@@ -23,12 +23,18 @@ function write_bmf(filename, mesh)
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% Stage 1: Validate Inputs and Initialize the Algorithm
+%% 阶段 1: 以短时重试方式打开输出文件
 
-    fid = fopen(filename,'w');
+    [fid, openMessage] = open_bmf_with_retry(filename, 10, 0.05); % [s]
+
     if fid == -1
-        error('Unable to create the BMF file: %s', filename);
+        error('CRESTU:BmfWriteOpen', ...
+            'Unable to create the BMF file: %s (%s)', filename, openMessage);
     end
+
+    fileCleanup = onCleanup(@() fclose(fid));
+
+%% 阶段 2: 写入 BMF 头部和逐面元顶点
 
     unique_types = unique(mesh.panel_type);
     if length(unique_types) == 1
@@ -48,7 +54,29 @@ function write_bmf(filename, mesh)
                 mesh.vertices(k, vertexIndex, 1), mesh.vertices(k, vertexIndex, 2), mesh.vertices(k, vertexIndex, 3));
         end
     end
-    fclose(fid);
+    clear fileCleanup
 
     fprintf('[OK] BMF mesh exported: %s (NPAN=%d, Type=%d)\n', filename, mesh.n_panels, main_type);
+end
+
+function [fileIdentifier, openMessage] = open_bmf_with_retry( ...
+        filename, maximumAttemptCount, retryDelaySeconds)
+% OPEN_BMF_WITH_RETRY Tolerate short-lived Windows file-indexing locks.
+
+    fileIdentifier = -1;
+    openMessage = '';
+
+    for attemptIndex = 1:maximumAttemptCount
+        [fileIdentifier, openMessage] = fopen(filename, 'w');
+
+        if fileIdentifier >= 0
+            return
+        end
+
+        if attemptIndex < maximumAttemptCount
+            fprintf('[WARN] BMF write retry %d/%d | %s\n', ...
+                attemptIndex, maximumAttemptCount, filename);
+            pause(retryDelaySeconds); % [s]
+        end
+    end
 end

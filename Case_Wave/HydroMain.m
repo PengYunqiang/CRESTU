@@ -26,16 +26,23 @@ function results = HydroMain(config_file)
 %HYDROMAIN Entry point for the CRESTU frequency-domain Rankine solver.
 %% Stage 1: Initialize inputs and dependencies
 
-    here = fileparts(mfilename('fullpath'));
+    caseWaveDirectory = fileparts(mfilename('fullpath'));
 
-%% Stage 2: Run the core calculation
+%% 阶段 2: 加载真实源码目录并运行主求解
 
-    root = fileparts(here);
-    addpath(fullfile(root,'1.Input'),fullfile(root,'2.Mesh'),fullfile(root,'3.HessSmith'), ...
-        fullfile(root,'4.Potential'),fullfile(root,'5.Force'), ...
-        fullfile(root,'6.MeanDriftLoads'),here);
+    projectDirectory = fileparts(caseWaveDirectory);
+    sourceDirectory = fullfile(projectDirectory, 'Source Code');
+    assert(isfolder(sourceDirectory), 'CRESTU:SourceDirectoryMissing', ...
+        'CRESTU source directory was not found: %s', sourceDirectory);
+    addpath(fullfile(sourceDirectory,'0.Tools Code'), ...
+        fullfile(sourceDirectory,'1.Input'), ...
+        fullfile(sourceDirectory,'2.Mesh'), ...
+        fullfile(sourceDirectory,'3.HessSmith'), ...
+        fullfile(sourceDirectory,'4.Potential'), ...
+        fullfile(sourceDirectory,'5.Force'), ...
+        fullfile(sourceDirectory,'6.MeanDriftLoads'),caseWaveDirectory);
     if nargin<1 || isempty(config_file)
-        config_file = fullfile(here,'CRESTU.cfg');
+        config_file = fullfile(caseWaveDirectory,'CRESTU.cfg');
     end
     results = run_frequency_domain_case(config_file);
 end

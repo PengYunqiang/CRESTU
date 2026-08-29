@@ -27,6 +27,7 @@ function [solution, factors] = solve_complex_system(A, B, factors)
 
 %% Stage 1: Validate Inputs and Initialize the Algorithm
 
+    % <<<CORE>>> solve_rankine_complex_system, paper_eq=none, benchmark=single_sphere_linear_residual
     if nargin < 3 || isempty(factors)
         if size(A, 1) ~= size(A, 2)
             error('CRESTU:SystemShape','A must be square.');
@@ -46,4 +47,5 @@ function [solution, factors] = solve_complex_system(A, B, factors)
         permutationVector = factors.p;
     end
     solution = upperFactor \ (lowerFactor \ B(permutationVector, :));
+    % <<</CORE>>>
 end

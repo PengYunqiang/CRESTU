@@ -206,11 +206,55 @@ function cfg = read_config(config_file)
     cfg.files.farfield = fullfile(cfg.config_dir, sprintf('%s_farfield.bmf', cfg.case_name));
     cfg.files.potential_cache = fullfile(cfg.config_dir, sprintf('%s_PotCache.mat', cfg.case_name));
     cfg.files.results = fullfile(cfg.config_dir, sprintf('%s_Results.mat', cfg.case_name));
+    cfg.outer_reference_mesh_file = parse_outer_reference_mesh(sections, cfg.config_dir);
     fprintf('[OK] Loaded %s\n', config_file);
     fprintf('    Case=%s, IPOTEN=%d, IFORCE=%d, IRAD=%d, IDIFF=%d, IDRIFT=%d\n', cfg.case_name, ...
         cfg.run.ipoten, cfg.run.iforce, cfg.run.irad, cfg.run.idiff, cfg.run.idrift);
     fprintf('    Bodies=%d, frequencies=%d, headings=%d, depth=%.3g m\n', ...
         cfg.n_bodies, cfg.freq.nfreq, cfg.wave.ndir, cfg.water_depth);
+end
+
+function meshFilename = parse_outer_reference_mesh(sections, configDirectory)
+% PARSE_OUTER_REFERENCE_MESH Read an optional fixed waterline reference mesh.
+%
+% Syntax:
+%   meshFilename = parse_outer_reference_mesh(sections, configDirectory)
+%
+% Inputs:
+%   sections        - Parsed configuration sections [-].
+%   configDirectory - Configuration-file directory [-].
+%
+% Outputs:
+%   meshFilename    - Absolute reference BMF path, or empty text [-].
+
+    %% 阶段 1: 处理未配置的可选段
+
+    meshFilename = '';
+
+    if ~isfield(sections, 'PARA11')
+        return
+    end
+
+    assert(numel(sections.PARA11) == 1, ...
+        'CRESTU:OuterReferenceShape', ...
+        'PARA11 requires exactly one OUTER_WATERLINE_MESH record.');
+
+    %% 阶段 2: 解析并验证外域水线参考网格
+
+    tokens = regexp(strtrim(sections.PARA11{1}), '\s+', 'split');
+    assert(numel(tokens) == 2 && ...
+        strcmpi(tokens{1}, 'OUTER_WATERLINE_MESH'), ...
+        'CRESTU:OuterReferenceSyntax', ...
+        'PARA11 syntax is: OUTER_WATERLINE_MESH path-or-NONE.');
+
+    if strcmpi(tokens{2}, 'NONE')
+        return
+    end
+
+    meshFilename = resolve_path(configDirectory, tokens{2});
+    assert(isfile(meshFilename), 'CRESTU:OuterReferenceMissing', ...
+        'Outer-domain waterline reference mesh was not found: %s', ...
+        meshFilename);
 end
 
 function sections = split_sections(lines)

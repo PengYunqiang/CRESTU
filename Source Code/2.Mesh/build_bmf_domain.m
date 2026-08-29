@@ -30,7 +30,7 @@ function domain = build_bmf_domain(config_file)
     cfg = read_config(config_file);
     [cfg, cfg.fs.tuning_report] = tune_sponge_layer(cfg, cfg.freq.omegas);
     body_list = cell(cfg.n_bodies, 1);
-    waterlines = cell(cfg.n_bodies, 1);
+    bodyWaterlines = cell(cfg.n_bodies, 1);
     total_body_panels = 0;
     for bodyIndex = 1:cfg.n_bodies
         bc = cfg.bodies(bodyIndex);
@@ -48,20 +48,21 @@ function domain = build_bmf_domain(config_file)
         mesh.cg = cfg.mass_props(bodyIndex).cg;
         mesh.body_id = bc.id;
         body_list{bodyIndex} = mesh;
-        waterlines{bodyIndex} = extract_waterline(mesh, cfg.z_tol);
+        bodyWaterlines{bodyIndex} = extract_waterline(mesh, cfg.z_tol);
         total_body_panels = total_body_panels + mesh.n_panels;
     end
+    outerWaterlines = resolve_outer_waterlines(cfg, bodyWaterlines);
     if cfg.n_bodies == 1
-        waterline = waterlines{1};
-        mesh_fs = generate_free_surface_bmf(cfg.files.fs, waterline, cfg);
+        mesh_fs = generate_free_surface_bmf(cfg.files.fs, ...
+            outerWaterlines{1}, cfg);
     else
-        waterline = waterlines;
-        mesh_fs = generate_multibody_free_surface_bmf(cfg.files.fs, waterlines, cfg);
+        mesh_fs = generate_multibody_free_surface_bmf(cfg.files.fs, ...
+            outerWaterlines, cfg);
     end
     has_seabed = cfg.water_depth > 0;
     mesh_seabed = [];
     mesh_farfield = [];
-    reference_waterline = waterlines{1};
+    reference_waterline = outerWaterlines{1};
     if has_seabed
         if (cfg.isx || cfg.isy) && cfg.n_bodies == 1
             full_wl = complete_waterline_by_symmetry(reference_waterline, cfg.isx, cfg.isy);
@@ -81,14 +82,70 @@ function domain = build_bmf_domain(config_file)
         write_bmf(cfg.files.seabed, mesh_seabed);
         write_bmf(cfg.files.farfield, mesh_farfield);
     end
-    stats = struct('total_body_panels', total_body_panels,'fs_panels', mesh_fs.n_panels, ...
+    stats = struct('total_body_panels', total_body_panels, ...
+'body_vertices', count_unique_body_vertices(body_list), ...
+'waterline_panels', count_waterline_segments(bodyWaterlines), ...
+'outer_waterline_panels', count_waterline_segments(outerWaterlines), ...
+'fs_panels', mesh_fs.n_panels, ...
 'seabed_panels', panel_count(mesh_seabed),'farfield_panels', panel_count(mesh_farfield));
     stats.total_dofs = stats.total_body_panels + stats.fs_panels + stats.seabed_panels + stats.farfield_panels;
     domain = struct('cfg', cfg,'body_list', {body_list},'fs', mesh_fs,'seabed', mesh_seabed, ...
-'farfield', mesh_farfield,'waterline', {waterline},'stats', stats);
+'farfield', mesh_farfield,'waterline', {bodyWaterlines}, ...
+'body_waterlines', {bodyWaterlines},'outer_waterlines', {outerWaterlines}, ...
+'stats', stats);
     domain.geometry = merge_domain_geometry(domain);
     fprintf('[INFO] Domain: %d bodies / %d body panels / %d total panels.\n', ...
         cfg.n_bodies, total_body_panels, stats.total_dofs);
+end
+
+function outerWaterlines = resolve_outer_waterlines(cfg, bodyWaterlines)
+% RESOLVE_OUTER_WATERLINES Select body-coupled or fixed outer-domain waterlines.
+
+    %% 阶段 1: 默认采用当前物面的真实水线
+
+    outerWaterlines = bodyWaterlines;
+
+    if isempty(cfg.outer_reference_mesh_file)
+        return
+    end
+
+    assert(cfg.n_bodies == 1, 'CRESTU:OuterReferenceBodyCount', ...
+        'A fixed outer waterline reference is currently supported for one body.');
+
+    %% 阶段 2: 从指定几何提取独立的外域参考水线
+
+    referenceMesh = read_bmf(cfg.outer_reference_mesh_file);
+    referenceMesh = transform_body_mesh(referenceMesh, cfg.bodies(1));
+    referenceMesh = reduce_mesh_by_symmetry(referenceMesh, cfg.isx, ...
+        cfg.isy, cfg.z_tol);
+    outerWaterlines = {extract_waterline(referenceMesh, cfg.z_tol)};
+    fprintf('[INFO] Fixed outer-domain waterline reference: %s\n', ...
+        cfg.outer_reference_mesh_file);
+end
+
+function vertexCount = count_unique_body_vertices(bodyList)
+% COUNT_UNIQUE_BODY_VERTICES Count actual unique body vertices in global coordinates.
+
+    vertexRows = cellfun(@(mesh) reshape(mesh.vertices, [], 3), ...
+        bodyList, 'UniformOutput', false);
+    vertexRows = vertcat(vertexRows{:});
+    vertexCount = size(unique(vertexRows, 'rows'), 1);
+end
+
+function segmentCount = count_waterline_segments(waterlines)
+% COUNT_WATERLINE_SEGMENTS Count closed or open waterline boundary panels.
+
+    segmentCount = 0;
+
+    for waterlineIndex = 1:numel(waterlines)
+        waterline = waterlines{waterlineIndex};
+
+        if waterline.is_closed
+            segmentCount = segmentCount + waterline.n_pts;
+        else
+            segmentCount = segmentCount + max(0, waterline.n_pts - 1);
+        end
+    end
 end
 
 function panelCount = panel_count(mesh)

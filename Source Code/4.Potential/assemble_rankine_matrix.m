@@ -76,6 +76,7 @@ function [A, S_body, assembly_info] = assemble_rankine_matrix(N, centers, normal
     end
     ff_idx = n_body + n_fs + n_sb + (1:n_ff);
     nu(ff_idx) = k0;
+    % <<<CORE>>> assemble_rankine_influence_matrix, paper_eq=green_third_identity, benchmark=single_sphere_grid_audit
     A = complex(zeros(N, N));
     S_body = complex(zeros(N, n_body));
     inv4pi = 1 / (4 * pi);
@@ -120,6 +121,7 @@ function [A, S_body, assembly_info] = assemble_rankine_matrix(N, centers, normal
 'image_count', numel(image_weights),'image_labels', {image_labels}, ...
 'wavenumber', k0,'wavelength', 2 * pi / k0,'effective_mu0', effective_mu0, ...
 'sponge_width', sponge_width,'n_unknowns', N);
+    % <<</CORE>>>
     fprintf('[OK] Rankine assembly completed in %.3f s.\n', elapsed);
 end
 
