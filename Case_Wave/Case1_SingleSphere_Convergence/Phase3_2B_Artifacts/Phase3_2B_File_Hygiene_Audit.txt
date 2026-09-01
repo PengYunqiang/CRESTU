@@ -1,0 +1,26 @@
+FILE_HYGIENE_AUDIT
+Modified/added files relative to baseline: 39
+Deleted files: 0
+Added formal directory: Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts
+Added package directory: Phase3_2B_Artifacts/+phase32b
+Prohibited tracked MAT/BMF/cache/temp/MATLAB-prefs/WAMIT-raw count: 0
+All runtime BMF/MAT/cache and MATLAB preferences were removed after compact evidence extraction.
+
+GIT_STATUS_AFTER_STAGING_AND_TEMP_CLEANUP
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Finalize_Phase3_2B.m
+M  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Finalize_Phase3_2B_Resource_Plan.m
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_HUMAN_REVIEW_10MIN_CN.md
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_INDEPENDENT_REVIEW_CN.md
+M  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_RESPONSE_CONVERGENCE_CN.md
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Commit_Ledger.txt
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_File_Hygiene_Audit.txt
+AM Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Final_Git_Diff.txt
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Final_Status.csv
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Formal_Convergence.csv
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Formal_Response.csv
+M  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Legacy_Regression.csv
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resonance_Tracking.csv
+M  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resource_Pilot.csv
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resource_Pilot_Measurement.csv
+M  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resource_Plan.csv
+A  Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Reviewer_Gate.csv

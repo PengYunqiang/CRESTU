@@ -1,0 +1,126 @@
+BASELINE_COMMIT=4a1bb81f6db6e577a1b45263d9e224a9260a5153
+
+BASELINE_TO_WORKTREE_NAME_STATUS
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/+phase32b/assert_v5_match.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/+phase32b/empty_response_record.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/+phase32b/find_frozen_row.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/+phase32b/initialize.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/+phase32b/preview_operator_state.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/+phase32b/run_v5_case.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Analyze_Phase3_2B_Sentinel.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Finalize_Phase3_2B.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Finalize_Phase3_2B_Resource_Plan.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Initialize_Phase3_2B_Baseline.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_BASELINE_FREEZE_CN.md
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_HUMAN_REVIEW_10MIN_CN.md
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_INDEPENDENT_REVIEW_CN.md
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_RESPONSE_CONVERGENCE_CN.md
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Baseline_Provenance.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Commit_Ledger.txt
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Condition_Residual.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_File_Hygiene_Audit.txt
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Final_Git_Diff.txt
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Final_Status.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Formal_Convergence.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Formal_Response.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Legacy_Regression.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Mesh_Cost.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Predeclared_Response_Gates.md
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resonance_Tracking.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resource_Pilot.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resource_Pilot_Measurement.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resource_Plan.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Reviewer_Gate.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Sentinel_Adjacent_Sensitivity.png
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Sentinel_Convergence.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Sentinel_Response.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Sentinel_Response_Curves.png
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_V5_Frozen_Mesh_Manifest.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Prepare_Phase3_2B_Resource_Plan.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Run_Phase3_2B_Legacy_Regression.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Run_Phase3_2B_Resource_Pilot.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Run_Phase3_2B_Sentinel.m
+
+BASELINE_TO_WORKTREE_STAT
+warning: in the working copy of 'Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_HUMAN_REVIEW_10MIN_CN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_RESPONSE_CONVERGENCE_CN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Commit_Ledger.txt', LF will be replaced by CRLF the next time Git touches it
+ .../+phase32b/assert_v5_match.m                    |  58 +++
+ .../+phase32b/empty_response_record.m              |  51 ++
+ .../+phase32b/find_frozen_row.m                    |  14 +
+ .../Phase3_2B_Artifacts/+phase32b/initialize.m     | 211 +++++++++
+ .../+phase32b/preview_operator_state.m             |  26 ++
+ .../Phase3_2B_Artifacts/+phase32b/run_v5_case.m    | 289 ++++++++++++
+ .../Analyze_Phase3_2B_Sentinel.m                   | 513 +++++++++++++++++++++
+ .../Phase3_2B_Artifacts/Finalize_Phase3_2B.m       | 288 ++++++++++++
+ .../Finalize_Phase3_2B_Resource_Plan.m             |  83 ++++
+ .../Initialize_Phase3_2B_Baseline.m                | 282 +++++++++++
+ .../PHASE3_2B_BASELINE_FREEZE_CN.md                |  25 +
+ .../PHASE3_2B_HUMAN_REVIEW_10MIN_CN.md             |  12 +
+ .../PHASE3_2B_INDEPENDENT_REVIEW_CN.md             |  33 ++
+ .../PHASE3_2B_RESPONSE_CONVERGENCE_CN.md           |  33 ++
+ .../Phase3_2B_Baseline_Provenance.csv              |  19 +
+ .../Phase3_2B_Commit_Ledger.txt                    |  15 +
+ .../Phase3_2B_Condition_Residual.csv               |  19 +
+ .../Phase3_2B_File_Hygiene_Audit.txt               |  28 ++
+ .../Phase3_2B_Final_Git_Diff.txt                   |  66 +++
+ .../Phase3_2B_Artifacts/Phase3_2B_Final_Status.csv |  19 +
+ .../Phase3_2B_Formal_Convergence.csv               |   2 +
+ .../Phase3_2B_Formal_Response.csv                  |   2 +
+ .../Phase3_2B_Legacy_Regression.csv                |  17 +
+ .../Phase3_2B_Artifacts/Phase3_2B_Mesh_Cost.csv    |  19 +
+ .../Phase3_2B_Predeclared_Response_Gates.md        | 122 +++++
+ .../Phase3_2B_Resonance_Tracking.csv               |   2 +
+ .../Phase3_2B_Resource_Pilot.csv                   |   2 +
+ .../Phase3_2B_Resource_Pilot_Measurement.csv       |   2 +
+ .../Phase3_2B_Resource_Plan.csv                    |  19 +
+ .../Phase3_2B_Reviewer_Gate.csv                    |  15 +
+ .../Phase3_2B_Sentinel_Adjacent_Sensitivity.png    | Bin 0 -> 91080 bytes
+ .../Phase3_2B_Sentinel_Convergence.csv             |  67 +++
+ .../Phase3_2B_Sentinel_Response.csv                |  19 +
+ .../Phase3_2B_Sentinel_Response_Curves.png         | Bin 0 -> 146709 bytes
+ .../Phase3_2B_V5_Frozen_Mesh_Manifest.csv          |  19 +
+ .../Prepare_Phase3_2B_Resource_Plan.m              |  76 +++
+ .../Run_Phase3_2B_Legacy_Regression.m              | 293 ++++++++++++
+ .../Run_Phase3_2B_Resource_Pilot.m                 |  27 ++
+ .../Phase3_2B_Artifacts/Run_Phase3_2B_Sentinel.m   |  66 +++
+ 39 files changed, 2853 insertions(+)
+
+FINAL_CACHED_NAME_STATUS
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Finalize_Phase3_2B.m
+M	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Finalize_Phase3_2B_Resource_Plan.m
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_HUMAN_REVIEW_10MIN_CN.md
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_INDEPENDENT_REVIEW_CN.md
+M	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/PHASE3_2B_RESPONSE_CONVERGENCE_CN.md
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Commit_Ledger.txt
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_File_Hygiene_Audit.txt
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Final_Git_Diff.txt
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Final_Status.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Formal_Convergence.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Formal_Response.csv
+M	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Legacy_Regression.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resonance_Tracking.csv
+M	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resource_Pilot.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resource_Pilot_Measurement.csv
+M	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Resource_Plan.csv
+A	Case_Wave/Case1_SingleSphere_Convergence/Phase3_2B_Artifacts/Phase3_2B_Reviewer_Gate.csv
+
+FINAL_CACHED_STAT
+ .../Phase3_2B_Artifacts/Finalize_Phase3_2B.m       | 288 +++++++++++++++++++++
+ .../Finalize_Phase3_2B_Resource_Plan.m             |  37 ++-
+ .../PHASE3_2B_HUMAN_REVIEW_10MIN_CN.md             |  12 +
+ .../PHASE3_2B_INDEPENDENT_REVIEW_CN.md             |  33 +++
+ .../PHASE3_2B_RESPONSE_CONVERGENCE_CN.md           |  42 +--
+ .../Phase3_2B_Commit_Ledger.txt                    |  15 ++
+ .../Phase3_2B_File_Hygiene_Audit.txt               |  28 ++
+ .../Phase3_2B_Final_Git_Diff.txt                   |  66 +++++
+ .../Phase3_2B_Artifacts/Phase3_2B_Final_Status.csv |  19 ++
+ .../Phase3_2B_Formal_Convergence.csv               |   2 +
+ .../Phase3_2B_Formal_Response.csv                  |   2 +
+ .../Phase3_2B_Legacy_Regression.csv                |   8 +
+ .../Phase3_2B_Resonance_Tracking.csv               |   2 +
+ .../Phase3_2B_Resource_Pilot.csv                   |   2 +-
+ .../Phase3_2B_Resource_Pilot_Measurement.csv       |   2 +
+ .../Phase3_2B_Resource_Plan.csv                    |  36 +--
+ .../Phase3_2B_Reviewer_Gate.csv                    |  15 ++
+ 17 files changed, 572 insertions(+), 37 deletions(-)
