@@ -1,0 +1,7 @@
+omega_rad_s,level_count,all_requested_integer_counts_strictly_increase,all_component_mean_median_h_strictly_decrease,realized_steps_meet_requested_maxima,transition_median_h_strictly_decreases,same_frequency_outer_extent_exact,all_component_quality_rows_pass,all_topology_contracts_pass,combined_hashes_distinct,source_and_design_fixed,no_stale_result_reuse,frequency_geometry_gate
+0.5,3,1,1,1,1,1,1,1,1,1,1,PASS
+0.6,3,1,1,1,1,1,1,1,1,1,1,PASS
+1,3,1,1,1,1,1,1,1,1,1,1,PASS
+1.4,3,1,1,1,1,1,1,1,1,1,1,PASS
+1.5,3,1,1,1,1,1,1,1,1,1,1,PASS
+2,3,1,1,1,1,1,1,1,1,1,1,PASS

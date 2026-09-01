@@ -1,0 +1,6 @@
+statusName,statusValue,evidence
+V5_COMPONENT_QUALITY,PASS,Phase3_2A_V5_Mesh_Quality.csv
+V5_CONTROL_ISOLATION,PASS,Phase3_2A_V5_Control_Isolation.csv
+LEGACY_Q_ONLY_REGRESSION,PASS_EXACT_HASH_5_OF_5,Phase3_2A_Legacy_Regression.csv
+V1_V4_FAIL_EVIDENCE_PRESERVED,YES,../Phase3_2_Artifacts/Phase3_2_V1/V3/current CSV
+V5_MESH_GEOMETRY_GATE,PASS,18 fresh mesh-only cases
