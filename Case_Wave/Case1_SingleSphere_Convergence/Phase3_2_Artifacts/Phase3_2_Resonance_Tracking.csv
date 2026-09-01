@@ -1,0 +1,2 @@
+frequency_grid_rad_s,status,peak_frequency_rad_s,peak_RAO3_m_per_m,D3_minimum_frequency_rad_s,minimum_abs_D3_N_per_m,reason
+1.30:0.02:1.50,NOT_RUN_BLOCKED,NaN,NaN,NaN,NaN,MESH_GEOMETRY_GATE_FAIL

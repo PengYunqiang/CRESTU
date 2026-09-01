@@ -1,0 +1,110 @@
+diff --git a/Source Code/2.Mesh/apply_rankine_outer_truncation.m b/Source Code/2.Mesh/apply_rankine_outer_truncation.m
+index 55a69cc..4269064 100644
+--- a/Source Code/2.Mesh/apply_rankine_outer_truncation.m
++++ b/Source Code/2.Mesh/apply_rankine_outer_truncation.m
+@@ -68,11 +68,12 @@ function [freeSurface, bottom, outerBoundary, audit] = ...
+
+     [freeSurface, topRing, topInfo] = prepare_horizontal_surface( ...
+         freeSurface, desiredTopRadius, legacyRadius, commonThetaCount, ...
+-        startAngle, 0.0, topRadialTarget, topThetaTarget, cfg, 2);
++        startAngle, 0.0, topRadialTarget, topThetaTarget, cfg, 2, ...
++        thetaResolutionRequested);
+     [bottom, bottomRing, bottomInfo] = prepare_horizontal_surface( ...
+         bottom, desiredBottomRadius, legacyRadius, commonThetaCount, ...
+         startAngle, -cfg.water_depth, bottomRadialTarget, ...
+-        bottomThetaTarget, cfg, 4);
++        bottomThetaTarget, cfg, 4, thetaResolutionRequested);
+     topInfo.endpointThetaNodeCount = topThetaCount;
+     topInfo.wallRingNodeCount = size(topRing, 1);
+     topInfo.endpointToWallCountTransition = topThetaCount ~= commonThetaCount;
+@@ -487,7 +488,7 @@ end
+
+ function [mesh, outerRing, info] = prepare_horizontal_surface(mesh, ...
+         targetRadius, legacyRadius, commonThetaCount, startAngle, zValue, ...
+-        radialTarget, thetaTarget, cfg, panelType)
++        radialTarget, thetaTarget, cfg, panelType, gradualThetaTransition)
+     legacyRing = extract_outer_ring(mesh, zValue, legacyRadius);
+     legacyCount = size(legacyRing, 1);
+     tolerance = 64 * eps(max([targetRadius, legacyRadius, 1]));
+@@ -497,6 +498,8 @@ function [mesh, outerRing, info] = prepare_horizontal_surface(mesh, ...
+         info = surface_info(0, 0, 0, legacyCount, legacyCount, ...
+             radialTarget, max_ring_edge(outerRing), radialTarget, ...
+             thetaTarget, false, false);
++        info.ringThetaNodeCounts = legacyCount;
++        info.gradualThetaTransition = false;
+         return
+     end
+     retessellationOnly = extension <= tolerance;
+@@ -509,16 +512,34 @@ function [mesh, outerRing, info] = prepare_horizontal_surface(mesh, ...
+         mesh = append_horizontal_panels(mesh, panels, panelType, cfg);
+         appendedPanelCount = size(panels, 1);
+         radialLayerCount = 1;
++        ringThetaNodeCounts = [size(innerRing, 1); commonThetaCount];
+     else
+         replacedPanelCount = 0;
+         radialLayerCount = max(1, ceil(extension / radialTarget));
++        if gradualThetaTransition && commonThetaCount > legacyCount
++            minimumTransitionLayers = ceil( ...
++                (commonThetaCount - legacyCount) / 4);
++            radialLayerCount = max(radialLayerCount, ...
++                minimumTransitionLayers);
++        end
+         currentRing = legacyRing;
++        currentCount = legacyCount;
++        ringThetaNodeCounts = zeros(radialLayerCount + 1, 1);
++        ringThetaNodeCounts(1) = legacyCount;
+         panelBlocks = cell(radialLayerCount, 1);
+         for layerIndex = 1:radialLayerCount
+             radius = legacyRadius + extension * layerIndex / radialLayerCount;
+-            nextRing = circle_ring(radius, zValue, commonThetaCount, startAngle);
++            nextCount = commonThetaCount;
++            if gradualThetaTransition
++                nextCount = gradual_ring_count(legacyCount, ...
++                    commonThetaCount, currentCount, layerIndex, ...
++                    radialLayerCount);
++            end
++            nextRing = circle_ring(radius, zValue, nextCount, startAngle);
+             panelBlocks{layerIndex} = zipper_annulus(currentRing, nextRing);
+             currentRing = nextRing;
++            currentCount = nextCount;
++            ringThetaNodeCounts(layerIndex + 1) = nextCount;
+         end
+         panels = cat(1, panelBlocks{:});
+         mesh = append_horizontal_panels(mesh, panels, panelType, cfg);
+@@ -532,6 +553,36 @@ function [mesh, outerRing, info] = prepare_horizontal_surface(mesh, ...
+         radialLayerCount, legacyCount, commonThetaCount, maximumRadialStep, ...
+         max_ring_edge(outerRing), radialTarget, thetaTarget, true, ...
+         retessellationOnly);
++    info.ringThetaNodeCounts = ringThetaNodeCounts;
++    info.gradualThetaTransition = gradualThetaTransition && ...
++        commonThetaCount > legacyCount;
++    if numel(ringThetaNodeCounts) > 1
++        info.maximumAdjacentThetaCountRatio = max( ...
++            ringThetaNodeCounts(2:end) ./ ringThetaNodeCounts(1:end - 1));
++    else
++        info.maximumAdjacentThetaCountRatio = 1.0;
++    end
++    assert(~info.gradualThetaTransition || all( ...
++        diff(ringThetaNodeCounts) <= 4), ...
++        'CRESTU:OuterTruncationGradualThetaRatio', ...
++        'An explicit horizontal-annulus transition adds more than 4 nodes.');
++end
++
++function count = gradual_ring_count(legacyCount, finalCount, ...
++        previousCount, layerIndex, layerCount)
++% GRADUAL_RING_COUNT Distribute explicit count changes across radial layers.
++
++    if layerIndex == layerCount
++        count = finalCount;
++        return
++    end
++    interpolated = legacyCount + (finalCount - legacyCount) * ...
++        layerIndex / layerCount;
++    count = 4 * round(interpolated / 4);
++    count = min(finalCount, max(previousCount, count));
++    assert(mod(count, 4) == 0 && count >= legacyCount && ...
++        count <= finalCount, 'CRESTU:OuterTruncationGradualThetaCount', ...
++        'A gradual explicit theta count is invalid.');
+ end
+
+ function info = surface_info(replacedCount, appendedCount, radialLayers, ...

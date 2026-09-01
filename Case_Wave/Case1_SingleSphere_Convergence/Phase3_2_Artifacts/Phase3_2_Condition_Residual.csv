@@ -1,0 +1,2 @@
+scope,solve_status,raw_rcond,scaled_rcond,maximum_linear_residual,maximum_algebraic_residual,reason
+all,NOT_RUN_BLOCKED,NaN,NaN,NaN,NaN,No Rankine matrix assembled after geometry fail-early

@@ -1,0 +1,7 @@
+omega_rad_s,level_count,body_panel_counts,free_surface_panel_counts,bottom_panel_counts,farfield_panel_counts,body_count_changes,free_surface_count_changes,bottom_count_changes,farfield_count_changes,body_h_strictly_decreases,free_surface_h_strictly_decreases,bottom_h_strictly_decreases,wall_h_strictly_decreases,transition_h_strictly_decreases,component_geometry_hashes_distinct,outer_extent_fixed,physics_hash_fixed,source_hash_fixed,operator_hash_isolation,geometry_control_isolation
+0.5,3,192|300|588,928|1480|2856,1120|1780|3444,640|1120|1904,1,1,1,1,1,1,1,1,0,1,1,1,1,PENDING_SENTINEL_ASSEMBLY,FAIL
+0.6,3,192|300|588,928|1480|2856,1120|1780|3444,512|880|1456,1,1,1,1,1,1,1,1,1,1,1,1,1,PENDING_SENTINEL_ASSEMBLY,PASS
+1,3,192|300|588,928|1480|2856,1120|1780|3444,256|480|784,1,1,1,1,1,1,1,1,1,1,1,1,1,PENDING_SENTINEL_ASSEMBLY,PASS
+1.4,3,192|300|588,928|1480|2856,1120|1780|3444,256|400|672,1,1,1,1,1,1,1,1,1,1,1,1,1,PENDING_SENTINEL_ASSEMBLY,PASS
+1.5,3,192|300|588,928|1480|2856,1120|1780|3444,256|400|672,1,1,1,1,1,1,1,1,1,1,1,1,1,PENDING_SENTINEL_ASSEMBLY,PASS
+2,3,192|300|588,928|1480|2856,1120|1780|3444,192|320|560,1,1,1,1,1,1,1,1,1,1,1,1,1,PENDING_SENTINEL_ASSEMBLY,PASS

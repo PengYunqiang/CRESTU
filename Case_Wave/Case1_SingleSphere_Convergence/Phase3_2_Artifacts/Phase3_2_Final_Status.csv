@@ -1,0 +1,18 @@
+statusName,statusValue,evidence
+RUNTIME_PROVENANCE_GATE,PASS,Phase3_2_Runtime_Path_Resolution.csv
+Q_ONLY_LEGACY_GEOMETRY_REGRESSION,PASS_EXACT_HASH,Phase3_2_Legacy_Mesh_Regression.csv
+MESH_CONTROL_ISOLATION,FAIL,Phase3_2_Mesh_Control_Isolation.csv
+MESH_GEOMETRY_GATE,FAIL,Phase3_2_Mesh_Manifest.csv;Phase3_2_Mesh_Quality.csv
+ALGEBRAIC_GATE,NOT_RUN_BLOCKED,geometry fail-early before matrix assembly
+SENTINEL_CONVERGENCE,NOT_RUN_BLOCKED,Phase3_2_Sentinel_Convergence.csv
+FORMAL_CONVERGENCE,NOT_RUN_BLOCKED,Phase3_2_Formal_Convergence.csv
+RESONANCE_CONVERGENCE,NOT_RUN_BLOCKED,Phase3_2_Resonance_Tracking.csv
+ASYMPTOTIC_RANGE,NOT_DEMONSTRATED,no three-level numerical response
+PRODUCTION_MESH_RECOMMENDED,NO,no mesh passed all predeclared gates
+WAMIT_REFERENCE_PROVENANCE,PASS_READ_ONLY_EXTERNAL_HASHED,Phase3_2_WAMIT_Reference_Provenance.csv
+READY_FOR_QUANTITATIVE_WAMIT_AUDIT,NO,mesh preconditions not met
+WAMIT_QUANTITATIVE_ATTRIBUTION,BLOCKED,Task 7 not authorized
+PHYSICAL_VALIDATION,PARTIAL,Phase 3.1B carry-forward; no new physical validation
+REVIEWER_BLOCKERS,1,Phase3_2_Reviewer_Gate.csv
+READY_FOR_PRODUCTION,NO,mesh/numerical/physical validation incomplete
+PHASE3_2_OVERALL,BLOCKED,PHASE3_2_COORDINATED_MESH_CONVERGENCE_CN.md
