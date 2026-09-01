@@ -1,0 +1,4 @@
+inner_theta_count,normalized_inner_radius_m,gap_coefficient,transition_gap_m,minimum_angle_deg,maximum_aspect_ratio,angle_gate_deg,aspect_gate,analytic_gate_status
+32,50,0.4,3.920685613182424,37.52298032711777,1.639843936457559,35,12,PASS
+40,50,0.4,3.138363829113798,37.75640368127854,1.6319121662375091,35,12,PASS
+56,50,0.4,2.2428178894876716,38.01956119017142,1.6229212092635883,35,12,PASS
