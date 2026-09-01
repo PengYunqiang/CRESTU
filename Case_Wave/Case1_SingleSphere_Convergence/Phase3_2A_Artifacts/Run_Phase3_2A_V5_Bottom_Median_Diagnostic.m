@@ -48,7 +48,7 @@ function tableOut = Run_Phase3_2A_V5_Bottom_Median_Diagnostic()
     end
     tableOut = struct2table(rows);
     writetable(tableOut, fullfile(definition.artifactDirectory, ...
-        'Phase3_2A_V5_Bottom_Median_Diagnostics.csv'));
+        'Phase3_2A_V5_Bottom_Median_Diagnostics_GapV2.csv'));
 end
 
 function value = percentile(sortedValues, fraction)

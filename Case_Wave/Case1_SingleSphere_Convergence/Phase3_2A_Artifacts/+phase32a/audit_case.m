@@ -32,6 +32,9 @@ function [manifestTable, qualityTable] = audit_case( ...
     manifest.design_canonical_sha256 = ...
         string(definition.designCanonicalSHA256);
     manifest.design_git_blob_id = string(definition.designGitBlobID);
+    manifest.design_v2_canonical_sha256 = ...
+        string(definition.designV2CanonicalSHA256);
+    manifest.design_v2_git_blob_id = string(definition.designV2GitBlobID);
     manifest.stale_result_reuse = "NO_MESH_REGENERATED_IN_UNIQUE_DIRECTORY";
     manifestTable = struct2table(manifest);
 
