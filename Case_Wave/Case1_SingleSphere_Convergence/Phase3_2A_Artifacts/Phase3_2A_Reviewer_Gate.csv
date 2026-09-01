@@ -1,0 +1,15 @@
+reviewID,reviewItem,reviewStatus,blockerCount,evidence,notes
+1,Task 0 report counts are dynamically 72/36/36,PASS,0,Phase3_2_Final_Report_Integrity.csv,
+2,analytic triangle/quad metrics validated,PASS,0,Phase3_2A_Quality_Metric_Unit_Tests.csv,
+3,blocked-v4 72 rows independently reproduced,PASS,0,Phase3_2A_V4_Quality_Reconciliation.csv,
+4,generator/call-chain and panel IDs documented,PASS,0,Phase3_2A_Generator_Call_Chain.csv;Phase3_2A_FailBefore_Panel_Diagnostics.csv,
+5,new mode is explicit and default remains LEGACY,PASS,0,Phase3_2A_Topology_Design_Decision.md;source diff,
+6,legacy q-only geometry remains 5/5 exact,PASS,0,Phase3_2A_Legacy_Regression.csv,
+7,endpoint prototype is 24/24 quality PASS,PASS,0,Phase3_2A_Endpoint_Prototype_Quality.csv,
+8,v5 family is 72/72 quality PASS,PASS,0,Phase3_2A_V5_Mesh_Quality.csv,
+9,all six frequencies have strict count/h refinement,PASS,0,Phase3_2A_V5_Control_Isolation.csv,
+10,outer extent/manifold/orientation/waterline contracts pass,PASS,0,Phase3_2A_V5_Mesh_Manifest.csv,
+11,v1-v4 and Phase3.2A intermediate FAIL evidence preserved,PASS,0,initial/gap-v2 FAIL CSV and ../Phase3_2_Artifacts,No prior FAIL file was deleted or overwritten.
+12,two clean BEM bridge cases pass with cache MISS,PASS,0,Phase3_2A_BEM_Bridge_Smoke.csv,LEGACY max response rel diff=4.28e-13; new mode finite only.
+13,radiation/diffraction/traction/ABC/A-B/RAO physics unchanged,PASS,0,Phase3_2A_Production_Diff.txt,
+14,no formal/resonance/WAMIT/production-ready overclaim,PASS,0,Phase3_2A_Final_Status.csv,READY_FOR_PRODUCTION=NO; PHYSICAL_VALIDATION=PARTIAL.

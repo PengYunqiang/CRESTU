@@ -1,0 +1,13 @@
+captured_head=b2476a058aaeaff46a01f18271c868700e306d66
+base=225389a4f943bb1c4d809226ae6c72d3887dc5c5
+note=Subsequent audit-only commit is not self-listed.
+
+e0c6af3baab62536648b4900987820adb0eeccee|phase3.2a: validate quality metrics and audit polar generators
+9e20f3db41f74a4d2a8668beaa6962d2c598e604|phase3.2a: predeclare quality-controlled polar topology
+0efea9aca22e8a7044f682f3961a97a13e39a1dc|phase3.2a: add quality-controlled polar topology endpoints
+313c807fede8c1b67605209998ca8de9aa0ab13d|phase3.2a: preserve initial v5 median-refinement failure
+7cf99d628cbac8a766ea37723702634c2d4789e0|phase3.2a: predeclare connector gap refinement
+dc352c5306c2b91a719c90b782730cd46eb32ebd|phase3.2a: implement connector gap refinement
+a80c86e7c91075c3dbe2af09c04d617e71281b1a|phase3.2a: predeclare bottom core refinement schedule
+ca58907d065823af8d302b77d0f7ec33b780a288|phase3.2a: close v5 mesh geometry gate
+b2476a058aaeaff46a01f18271c868700e306d66|phase3.2a: add limited BEM bridge smoke evidence
