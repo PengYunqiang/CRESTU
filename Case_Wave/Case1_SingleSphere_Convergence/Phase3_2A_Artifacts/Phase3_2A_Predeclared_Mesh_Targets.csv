@@ -1,0 +1,4 @@
+mesh_level,topology_mode,body_division,inner_theta_count,final_wall_theta_count,near_radial_layers,minimum_outer_radial_layers,wall_vertical_control,inner_chord_target_m,requested_near_radial_step_m,transition_chord_target_m,requested_outer_radial_step_max_m,near_h_ratio_from_previous,theta_h_ratio_from_previous
+MESH_L1,QUALITY_CONTROLLED_V2,4,32,64,4,2,3,0.980171403295606,3.75,3.920685613182424,31.365484905459393,NaN,NaN
+MESH_L2,QUALITY_CONTROLLED_V2,5,40,80,5,3,4,0.7845909572784494,3,3.1383638291137976,25.10691063291038,1.25,1.249179463175463
+MESH_L3,QUALITY_CONTROLLED_V2,7,56,112,6,4,5,0.5607044723719179,2.5,2.2428178894876716,17.942543115901373,1.2,1.399146937103238
