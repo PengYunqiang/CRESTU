@@ -1,0 +1,8 @@
+captured_at_startup=2026-09-01 Asia/Shanghai
+git_repo_root=E:\GitWorktrees\CRESTU-Phase3\_2
+branch=phase3-2-mesh-convergence
+initial_head=7f2d391d1b42366fdb04e1b493439dab438584eb
+initial_status_short_branch=## phase3-2-mesh-convergence
+initial_porcelain_entry_count=0
+initial_worktree_status=clean
+note=Captured before any Phase 3.2 file was added or MATLAB output was generated.
