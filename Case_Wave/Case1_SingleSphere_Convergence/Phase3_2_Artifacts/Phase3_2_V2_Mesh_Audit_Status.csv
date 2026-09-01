@@ -1,0 +1,7 @@
+statusName,statusValue,evidence
+MESH_FAMILY_VERSION,v2,Phase3_2_Predeclared_Gates_v2.md
+FIRST_CASE,MESH_L1_omega_0p5,Run_Phase3_2_Mesh_Audit stdout
+MESH_GENERATION,FAIL_BEFORE,CRESTU:OuterTruncationThetaRounding
+MESH_GEOMETRY_GATE,NOT_REACHED,generator fail-early before first manifest row
+ALGEBRAIC_GATE,NOT_RUN,no BEM assembly
+PRODUCTION_PHYSICS_CHANGED,NO,no production source change in v2 attempt
