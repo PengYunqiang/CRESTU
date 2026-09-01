@@ -1,0 +1,4 @@
+mesh_level,topology_mode,waterline_theta_count,boundary_segments_per_quarter_nx,requested_side_block_radial_layers_nr,side_block_panel_count,central_patch_panel_count,total_structured_core_panel_count,boundary_node_contract
+MESH_L1,QUALITY_CONTROLLED_V2,32,8,4,128,64,192,UNCHANGED
+MESH_L2,QUALITY_CONTROLLED_V2,40,10,7,280,100,380,UNCHANGED
+MESH_L3,QUALITY_CONTROLLED_V2,56,14,12,672,196,868,UNCHANGED
