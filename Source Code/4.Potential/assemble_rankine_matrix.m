@@ -62,25 +62,48 @@ function [A, S_body, assembly_info] = assemble_rankine_matrix(N, centers, normal
     [image_vertices, image_normals, image_weights, image_labels] = prepare_images( ...
         vertices, normals, cfg.isx, cfg.isy, parity);
 
-    nu = zeros(N, 1);
     [k0, ~] = solve_wave_dispersion(omega, g, cfg.water_depth);
-    sponge_width = cfg.fs.r_outer - cfg.fs.r_inner;
-    effective_mu0 = min(2.5, max(cfg.fs.mu0, 12 / (k0 * sponge_width)));
-    fs_idx = n_body + (1:n_fs);
-    if n_fs > 0
-        radii = sqrt(sum(centers(fs_idx, 1:2) .^ 2, 2));
-        damping = zeros(n_fs, 1);
-        mask = radii > cfg.fs.r_inner;
-        damping(mask) = effective_mu0 * ((radii(mask) - cfg.fs.r_inner) / sponge_width) .^ 2;
-        damping = max(0, min(effective_mu0, damping));
-% exp(i*w*t): exp(-i*k*r), hence Im(k)<0 gives spatial decay.
-        nu(fs_idx) = k0 * (1 - 1i * damping);
+    free_surface_bc = get_rankine_free_surface_robin_bc( ...
+        centers, stats, omega, g, cfg);
+    nu0 = free_surface_bc.nu0; % [1/m], exact finite-depth linear FS Robin scale
+    free_surface_robin_convention = ...
+        'exp(+i*omega*t):dphi/dz=(omega^2/g)*(1-i*mu(r))*phi';
+    sponge_start = free_surface_bc.startRadius;
+    sponge_width = free_surface_bc.width;
+    effective_mu0 = free_surface_bc.actualMu0;
+    sponge_manifest = struct('inputMode', 'legacy-direct-fallback');
+    if isfield(cfg, 'phase2_2_controls') && ...
+            isfield(cfg.phase2_2_controls, 'effective')
+        sponge_state = cfg.phase2_2_controls.effective;
+        sponge_start = sponge_state.spongeStartRadiusM;
+        sponge_width = sponge_state.spongeWidthM;
+        effective_mu0 = sponge_state.actualMu0;
+        sponge_manifest = cfg.phase2_2_controls.manifest;
     end
-    ff_idx = n_body + n_fs + n_sb + (1:n_ff);
-    nu(ff_idx) = k0;
+    fs_idx = n_body + (1:n_fs);
+    nu = zeros(N, 1);
+% exp(i*w*t): exp(-i*k*r), hence Im(k)<0 gives spatial decay.
+    nu(fs_idx) = free_surface_bc.nu;
+    outer_bc = get_rankine_outer_absorbing_bc(centers, normals, stats, ...
+        omega, g, cfg.water_depth, cfg, k0, effective_mu0);
+    geometryHash = local_geometry_hash(centers, normals, vertices);
+    if isfield(cfg, 'phase2_2_controls') && ...
+            isfield(cfg.phase2_2_controls, 'effective') && ...
+            isfield(cfg.phase2_2_controls.effective, 'mergedGeometrySHA256')
+        geometryHash = cfg.phase2_2_controls.effective.mergedGeometrySHA256;
+    end
+    boundary_operator_state = get_rankine_boundary_operator_state( ...
+        free_surface_bc.cacheSpecification, ...
+        outer_bc.cacheSpecification, geometryHash);
     % <<<CORE>>> assemble_rankine_influence_matrix, paper_eq=green_third_identity, benchmark=single_sphere_grid_audit
     A = complex(zeros(N, N));
     S_body = complex(zeros(N, n_body));
+    auditOuterColumn = n_ff > 0 && isfield(cfg, 'outer_truncation') && ...
+        isfield(cfg.outer_truncation, 'effective') && ...
+        cfg.outer_truncation.effective.geometryModified;
+    auditOuterGlobalIndex = n_body + n_fs + n_sb + 1;
+    auditOuterSingleLayer = complex(zeros(N, auditOuterColumn));
+    auditOuterDoubleLayer = complex(zeros(N, auditOuterColumn));
     inv4pi = 1 / (4 * pi);
     fprintf('[INFO] Rankine assembly N=%d, parity=[%+d,%+d], images=%d\n', ...
         N, parity(1), parity(2), numel(image_weights)); timer = tic;
@@ -107,6 +130,10 @@ function [A, S_body, assembly_info] = assemble_rankine_matrix(N, centers, normal
             if i == j
                 Dij = Dij + 0.5;
             end
+            if auditOuterColumn && j == auditOuterGlobalIndex
+                auditOuterSingleLayer(i) = Sij;
+                auditOuterDoubleLayer(i) = Dij;
+            end
             if j <= n_body
                 rowA(j) = Dij;
                 rowS(j) = Sij;
@@ -115,26 +142,83 @@ function [A, S_body, assembly_info] = assemble_rankine_matrix(N, centers, normal
             elseif j <= n_body + n_fs + n_sb
                 rowA(j) = Dij;
             else
-% Far-field normals point inward: dphi/dn=+i*k*phi.
-                rowA(j) = Dij - 1i * nu(j) * Sij;
+% First-order local asymptotic absorbing BC with stored-inward normals.
+% This source-local gamma applies to every collocation row; it is not an
+% exact finite-radius Dirichlet-to-Neumann operator.
+                outerSourceIndex = j - (n_body + n_fs + n_sb);
+                rowA(j) = Dij + outer_bc.gamma(outerSourceIndex) * Sij;
             end
         end
         A(i, :) = rowA;
         S_body(i, :) = rowS;
     end
     elapsed = toc(timer);
+    outerSourceColumnAudit = struct('enabled', false);
+    if auditOuterColumn
+        gammaAudit = outer_bc.gamma(1);
+        reconstructedColumn = auditOuterDoubleLayer + ...
+            gammaAudit * auditOuterSingleLayer;
+        assembledColumn = A(:, auditOuterGlobalIndex);
+        reconstructionResidual = norm(assembledColumn - reconstructedColumn) / ...
+            max(norm(assembledColumn), eps);
+        assert(reconstructionResidual <= 1e-14, ...
+            'CRESTU:OuterTruncationColumnAudit', ...
+            'Instrumented outer column is not D+gamma_j*S.');
+        outerSourceColumnAudit = struct('enabled', true, ...
+            'sourceGlobalIndex', auditOuterGlobalIndex, ...
+            'sourceLocalIndex', 1, 'gamma', gammaAudit, ...
+            'canonicalFormula', 'D+gamma_j*S', ...
+            'reconstructionRelativeResidual', reconstructionResidual, ...
+            'singleLayerColumn', auditOuterSingleLayer, ...
+            'doubleLayerColumn', auditOuterDoubleLayer, ...
+            'assembledColumn', assembledColumn, ...
+            'singleLayerHash', hash_complex_column(auditOuterSingleLayer), ...
+            'doubleLayerHash', hash_complex_column(auditOuterDoubleLayer), ...
+            'assembledColumnHash', hash_complex_column(assembledColumn));
+    end
     assembly_info = struct('elapsed_seconds', elapsed,'parity', parity, ...
 'image_count', numel(image_weights),'image_labels', {image_labels}, ...
 'wavenumber', k0,'wavelength', 2 * pi / k0,'effective_mu0', effective_mu0, ...
-'sponge_width', sponge_width,'n_unknowns', N, ...
+'sponge_start_radius', sponge_start, 'sponge_width', sponge_width, ...
+'sponge_end_radius', sponge_start + sponge_width, ...
+'sponge_control_manifest', sponge_manifest, 'n_unknowns', N, ...
+'free_surface_robin_nu0', nu0, ...
+'free_surface_robin_base_scale', 'omega^2/g', ...
+'free_surface_robin_convention', free_surface_robin_convention, ...
+'free_surface_robin_coefficients', free_surface_bc.cacheSpecification, ...
+'boundary_operator_state', boundary_operator_state, ...
+'outer_absorbing_boundary', outer_bc.cacheSpecification, ...
 'double_layer_source_normal_convention', char(source_orientation.convention), ...
 'double_layer_component_names', source_orientation.componentNames, ...
 'double_layer_component_signs', source_orientation.componentSigns, ...
 'double_layer_orientation_hash', source_orientation.signatureHash, ...
 'double_layer_minimum_winding_alignment', ...
 source_orientation.minimumWindingAlignment);
+    assembly_info.outer_source_column_audit = outerSourceColumnAudit;
+    if isfield(cfg, 'outer_truncation') && ...
+            isfield(cfg.outer_truncation, 'effective')
+        assembly_info.outer_truncation = cfg.outer_truncation.effective;
+    else
+        assembly_info.outer_truncation = struct('enabled', false, ...
+            'geometryModified', false);
+    end
     % <<</CORE>>>
     fprintf('[OK] Rankine assembly completed in %.3f s.\n', elapsed);
+end
+
+function hashText = local_geometry_hash(centers, normals, vertices)
+% LOCAL_GEOMETRY_HASH Fallback identity for direct assembler calls.
+    values = [centers(:); normals(:); vertices(:)];
+    bytes = [reshape(typecast(uint64(size(values)), 'uint8'), 1, []), ...
+        reshape(typecast(double(values), 'uint8'), 1, [])];
+    hashText = sha256_hash(bytes);
+end
+
+function hashText = hash_complex_column(values)
+% HASH_COMPLEX_COLUMN Hash exact real/imaginary column bytes for audit.
+    bytes = [reshape(typecast(double(real(values(:))), 'uint8'), 1, []), ...
+        reshape(typecast(double(imag(values(:))), 'uint8'), 1, [])];
+    hashText = sha256_hash(bytes);
 end
 
 function [all_vertices, all_normals, weights, labels] = prepare_images(vertices, normals, isx, isy, parity)

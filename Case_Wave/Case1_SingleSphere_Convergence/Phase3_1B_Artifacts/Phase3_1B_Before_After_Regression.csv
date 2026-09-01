@@ -1,0 +1,4 @@
+metric,omega_rad_s,before_gate_pass,after_gate_pass,before_coarse_metric,after_dense_metric,threshold,production_real_before,production_imag_before,production_real_after,production_imag_after,relative_numeric_change,adjudication
+A33,0.6,0,1,0.734631341570594,0.0245618127883018,0.5,66110.7347257322,0,66110.7347257322,0,0,dense-local coefficient continuity
+B33,0.6,0,1,0.596420376462823,0.0375285514277176,0.5,73275.3574121985,0,73275.3574121985,0,0,dense-local coefficient continuity
+RAO3_complex,1.4,0,1,0.675183131624015,0.346085986548557,0.5,1.55798333797436,-2.34879061760636,1.55798333797436,-2.34879061760636,0,dense complex/amplitude continuity with finite physical-resonance D3 minimum

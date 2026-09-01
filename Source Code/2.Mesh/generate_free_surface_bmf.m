@@ -1,4 +1,4 @@
-function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
+function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg, writeOutput)
 % GENERATE_FREE_SURFACE_BMF Generate free surface bmf for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
@@ -26,6 +26,9 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
 
 %% Stage 1: Validate Inputs and Initialize the Algorithm
 
+    if nargin < 4 || isempty(writeOutput)
+        writeOutput = true;
+    end
     if nargin < 1 || isempty(filename)
         filename = cfg.files.fs;
     end
@@ -33,6 +36,10 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
     nr_near = cfg.fs.nr_near;
     nr_sponge = cfg.fs.nr_sponge;
     r_inner_base = cfg.fs.r_inner;
+    if isfield(cfg, 'phase2_2_controls') && ...
+            cfg.phase2_2_controls.sectionPresent
+        r_inner_base = cfg.phase2_2_controls.meshTransitionRadiusM;
+    end
     r_outer = cfg.fs.r_outer;
     sponge_ratio = cfg.fs.sponge_ratio;
     mu0 = cfg.fs.mu0;
@@ -229,5 +236,7 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg)
     mesh_fs.mu_damping = mu_layer;
     mesh_fs.hydrostatics = struct('Vx', 0,'Vy', 0,'Vz', 0,'V_mean', 0,'center_of_buoyancy', [0, 0, 0]);
 
-    write_bmf(filename, mesh_fs);
+    if writeOutput
+        write_bmf(filename, mesh_fs);
+    end
 end

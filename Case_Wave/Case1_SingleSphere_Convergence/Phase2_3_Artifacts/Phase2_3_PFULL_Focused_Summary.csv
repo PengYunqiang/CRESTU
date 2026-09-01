@@ -1,0 +1,10 @@
+metric,value
+panel_count,2752
+farfield_panel_count,272
+max_abs_ntheta,1.94719585036681e-15
+gamma_max_relative_error,1.60306799775579e-16
+max_farfield_column_residual,2.00150994626751e-16
+p95_farfield_column_residual,1.42871431869814e-16
+farfield_block_frobenius_residual,5.19521468646348e-17
+focused_linear_relative_residual,8.00262089350084e-14
+reviewer_blockers,0

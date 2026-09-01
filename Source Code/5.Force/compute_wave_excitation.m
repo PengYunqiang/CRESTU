@@ -44,5 +44,6 @@ function [force, pressure] = compute_wave_excitation(phi_incident, phi_diffracti
         error('CRESTU:ExcitationShape','Incident/diffraction potentials, normals, and areas are inconsistent.');
     end
     pressure = -1i * omega * rho * (phi_incident + phi_diffraction);
-    force = nj.' * (pressure .* areas);
+% Body generalized load is the negative pressure traction integral.
+    force = -nj.' * (pressure .* areas);
 end

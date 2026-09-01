@@ -29,6 +29,7 @@ function domain = build_bmf_domain(config_file)
     end
     cfg = read_config(config_file);
     [cfg, cfg.fs.tuning_report] = tune_sponge_layer(cfg, cfg.freq.omegas);
+    cfg = apply_phase2_2_mesh_controls(cfg);
     body_list = cell(cfg.n_bodies, 1);
     bodyWaterlines = cell(cfg.n_bodies, 1);
     total_body_panels = 0;
@@ -64,23 +65,36 @@ function domain = build_bmf_domain(config_file)
     mesh_farfield = [];
     reference_waterline = outerWaterlines{1};
     if has_seabed
+        [bottom_cfg, bottom_reference_surface] = ...
+            get_phase2_2_bottom_mesh_inputs(cfg, reference_waterline, mesh_fs);
         if (cfg.isx || cfg.isy) && cfg.n_bodies == 1
             full_wl = complete_waterline_by_symmetry(reference_waterline, cfg.isx, cfg.isy);
             cfg_full = cfg;
             cfg_full.isx = 0;
             cfg_full.isy = 0;
-            mesh_seabed = generate_reduced_seabed_mesh(cfg, full_wl.n_pts);
+            mesh_seabed = generate_reduced_seabed_mesh(bottom_cfg, full_wl.n_pts);
             mesh_farfield = generate_farfield_mesh(full_wl, cfg_full, cfg.fs.nz_farfield);
             mesh_farfield = reduce_mesh_by_symmetry(mesh_farfield, cfg.isx, cfg.isy, cfg.z_tol);
         elseif cfg.n_bodies == 1
-            mesh_seabed = generate_seabed_mesh(reference_waterline, cfg, mesh_fs);
+            mesh_seabed = generate_seabed_mesh(reference_waterline, ...
+                bottom_cfg, bottom_reference_surface);
             mesh_farfield = generate_farfield_mesh(reference_waterline, cfg, cfg.fs.nz_farfield);
         else
             mesh_seabed = generate_seabed_disk_mesh(cfg, mesh_fs);
             mesh_farfield = generate_farfield_mesh(reference_waterline, cfg, cfg.fs.nz_farfield);
         end
+        [mesh_fs, mesh_seabed, mesh_farfield, ...
+            cfg.outer_truncation.effective] = apply_rankine_outer_truncation( ...
+            mesh_fs, mesh_seabed, mesh_farfield, cfg, ...
+            max(cfg.fs.tuning_report.wavelengths));
+        if cfg.outer_truncation.effective.geometryModified
+            write_bmf(cfg.files.fs, mesh_fs);
+        end
         write_bmf(cfg.files.seabed, mesh_seabed);
         write_bmf(cfg.files.farfield, mesh_farfield);
+    else
+        cfg.outer_truncation.effective = struct('enabled', false, ...
+            'geometryModified', false, 'reason', 'infinite-depth');
     end
     stats = struct('total_body_panels', total_body_panels, ...
 'body_vertices', count_unique_body_vertices(body_list), ...

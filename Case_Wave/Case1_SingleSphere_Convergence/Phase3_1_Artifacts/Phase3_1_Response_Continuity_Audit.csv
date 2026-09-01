@@ -1,0 +1,5 @@
+metricName,maximumInteriorDeviation,omegaAtMaximumInteriorDeviation,maximumPhaseStepDeg,isolatedSignFlipCount,gatePass,preliminaryGatePass,denseEvidenceStatus,denseEvidenceMetric,denseEvidenceValue,denseEvidenceThreshold,adjudicationNote
+A33,0.734631341570594,0.6,0,0,1,0,PASS,dense_local_three_point_deviation,0.0245618127883018,0.5,Coarse-grid curvature resolved as dense-local continuous.
+B33,0.596420376462823,0.6,0,0,1,0,PASS,dense_local_three_point_deviation,0.0375285514277176,0.5,Coarse-grid curvature resolved as dense-local continuous.
+F3_complex,0.402953855284782,1.6,44.8601861914283,0,1,1,NOT_REQUIRED,,NaN,NaN,
+RAO3_complex,0.675183131624015,1.4,47.7946742509727,0,1,0,PASS,max_dense_normalized_complex_step,0.346085986548557,0.5,Dense complex/amplitude response is continuous; finite D3 has a physical-resonance minimum.

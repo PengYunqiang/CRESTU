@@ -1,6 +1,7 @@
 function [damping, diagnostics] = compute_radiation_damping_energy( ...
         phi_radiation, nj, centers, normals, areas, omega, cfg, mode_parity, n_theta)
-% COMPUTE_RADIATION_DAMPING_ENERGY Evaluate radiation damping from the far-boundary energy flux.
+% COMPUTE_RADIATION_DAMPING_ENERGY Deprecated compatibility wrapper only.
+% Active scientific analysis must call compute_haskind_damping_candidate.
 %
 % Syntax:
 %   [damping, diagnostics] = compute_radiation_damping_energy(phi_radiation, nj, centers, normals, areas, omega, cfg, mode_parity, n_theta)
@@ -32,33 +33,17 @@ function [damping, diagnostics] = compute_radiation_damping_energy( ...
 %
 % Lead Authors: Yunqiang Peng, Zhentao Jiang (SJTU)
 
-%% Stage 1: Validate Inputs and Initialize the Algorithm
-
-    if nargin < 9 || isempty(n_theta)
-        n_theta = 72;
+    if nargin < 9
+        n_theta = [];
     end
-    % <<<CORE>>> radiation_damping_energy_check, paper_eq=haskind_energy_identity, benchmark=single_sphere_pressure_energy
-    headings = (0:n_theta - 1) * (360 / n_theta);
-    dtheta = 2 * pi / n_theta;
-    force = compute_haskind_excitation(phi_radiation, nj, centers, normals, areas, ...
-        omega, cfg, headings, mode_parity);
-    [wave_number, ~] = solve_wave_dispersion(omega, cfg.grav, cfg.water_depth);
-    if cfg.water_depth > 0
-        kh = wave_number * cfg.water_depth;
-        depth_factor = tanh(kh) + kh / (cosh(kh)^2);
-    else
-        depth_factor = 1;
-    end
-    prefactor = omega * wave_number / (4 * pi * cfg.rho * cfg.grav^2 * depth_factor);
-    damping = real(prefactor * (force * force') * dtheta);
-    damping = 0.5 * (damping + damping.');
-    eigenvalues = eig(damping);
-    tolerance = 1e-10 * max(1, max(abs(eigenvalues)));
-    if min(eigenvalues) < -tolerance
-        warning('CRESTU:EnergyDampingPSD','Energy damping has minimum eigenvalue %g.', min(eigenvalues));
-    end
-    diagnostics = struct('method','Haskind energy flux','headings', headings, ...
-'haskind_excitation', force,'depth_factor', depth_factor,'wavenumber', wave_number, ...
-'min_eigenvalue', min(eigenvalues));
-    % <<</CORE>>>
+    [damping, candidateDiagnostics] = ...
+        compute_haskind_damping_candidate(phi_radiation, nj, centers, ...
+        normals, areas, omega, cfg, mode_parity, n_theta);
+    diagnostics = struct('deprecatedCompatibility', struct( ...
+        'legacyFunctionName', 'compute_radiation_damping_energy', ...
+        'replacementFunctionName', ...
+        'compute_haskind_damping_candidate', ...
+        'semanticWarning', ['The legacy name is not an energy-flux path; ', ...
+        'consume candidateDiagnostics only as NOT_VALIDATED.'], ...
+        'candidateDiagnostics', candidateDiagnostics));
 end

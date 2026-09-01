@@ -1,0 +1,6 @@
+scope,status,blocker_count,classification,notes
+formal_response_continuity,FAIL,1,BLOCKER,"A33 and B33 have coincident isolated anomalies at omega=0.6 rad/s; RAO3 complex response also exceeds the 0.50 interior-deviation gate at omega=1.4 rad/s."
+algebraic_and_implementation,PASS,0,RESOLVED,"All 16 solves completed; rcond/residual, omega=1.5 frozen regression, source hashes, and P_FULL plumbing pass."
+outer_radius_screening,PASS,0,RESOLVED,"R/1.25R/1.5R physical-radius factors pass for 0.5, 0.6, 1.2, 1.4, and 2.0 rad/s; 2R was not required."
+error_attribution,OPEN,0,UNCERTAIN,"The response anomaly is not identified as an ABC or dominant outer-boundary truncation error; frequency-local discretization, quadrature, and source formulation remain candidates."
+overall,FAIL,1,BLOCKER,"Frequency-response stability is not closed; do not advance to formal Phase 3.2 mesh convergence yet."

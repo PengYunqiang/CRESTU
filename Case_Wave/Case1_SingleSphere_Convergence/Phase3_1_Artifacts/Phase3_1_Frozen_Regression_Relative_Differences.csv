@@ -1,0 +1,6 @@
+metric,currentReal,currentImag,frozenReal,frozenImag,absoluteDifference,relativeDifference,tolerance,gatePass
+F3_complex,86836.1937384934,132222.104642785,86836.193738561,132222.104642787,6.76715817145492e-08,4.27794130485555e-13,1e-10,1
+raw_rcond,2.31950141753968e-05,0,2.31950141753968e-05,0,0,0,1e-10,1
+scaled_rcond,6.18624988260384e-05,0,6.18624988260384e-05,0,0,0,1e-10,1
+bem_unknown_count,2752,0,2752,0,0,0,0,1
+farfield_panel_count,272,0,272,0,0,0,0,1

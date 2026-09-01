@@ -1,0 +1,21 @@
+statusName,statusValue,evidence
+PHASE2_3_BASELINE_REGRESSION,PASS,Phase3_1_Frozen_Regression_Relative_Differences.csv
+PRODUCTION_ABC_CHANGED,NO,Phase3_1_Production_Source_SHA256_Before/After.csv
+OMEGA_0P6_FIRST_ANOMALOUS_LAYER,POTENTIAL,Phase3_1B_Layer_Continuity_Ledger.csv
+RAW_RADIATION_FORCE_CONTINUITY,PASS,Phase3_1B_Raw_F33_Complex_Force.csv
+AB_EXTRACTION_CONTINUITY,PASS,Phase3_1B_Radiation_Quantity_Lineage.csv
+FREQUENCY_LOCAL_MESH_DISCONTINUITY,NO,target triplet counts/branches identical; radii monotone; hashes frequency-local
+FREQUENCY_LOCAL_DISCRETIZATION_CAUSAL,NO,Phase3_1B_Fixed_Geometry_Comparison.csv
+RANKINE_QUADRATURE_SENSITIVITY,UNRESOLVED,not executed because no dense anomaly remained
+RADIATION_BOUNDARY_SENSITIVITY,NO,Phase3_1_Outer_Radius_Convergence.csv
+TRUNCATED_DOMAIN_NUMERICAL_MODE,UNRESOLVED,antecedent false: dense/fixed anomaly absent; mode test not triggered
+OMEGA_0P6_ROOT_CAUSE,coarse frequency-grid curvature aliasing of a dense-local continuous Rankine-only response,dense phi/F/A/B continuity and unchanged extraction identity
+OMEGA_1P4_RAO3_CLASSIFICATION,PHYSICAL_RESONANCE,D3_min=72068.3313; RAO_max=2.81853321 at omega=1.4
+PRODUCTION_FIX_IMPLEMENTED,NO,production response values identical before/after
+PRODUCTION_FIX_DESCRIPTION,no production numerical formula or mesh topology changed,Phase3_1B_Before_After_Regression.csv
+VALIDATION_HARNESS_FIX_IMPLEMENTED,YES_DENSE_EVIDENCE_ADJUDICATION_ONLY,Phase3_1_Response_Continuity_Audit.csv retains preliminary and final gates
+FORMAL_FREQUENCY_SWEEP_AFTER_FIX,PASS,Phase3_1_Formal_PFull_Frequency_Sweep.csv
+OUTER_RADIUS_REGRESSION,PASS,Phase3_1_Outer_Radius_Convergence.csv
+FREQUENCY_RESPONSE_CONTINUITY,PASS,formal+dense complex/amplitude gates
+REVIEWER_BLOCKERS,0,Phase3_1B_Reviewer_Gate.csv
+READY_FOR_PHASE3_2_MESH_CONVERGENCE,YES,all final verifier assertions passed

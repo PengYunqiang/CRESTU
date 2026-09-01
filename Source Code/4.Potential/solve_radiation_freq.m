@@ -47,9 +47,12 @@ function result = solve_radiation_freq(domain, omega, rho, gravity)
     nj = compute_generalized_normals(geom.centers(1:nb, :), geom.normals(1:nb, :), domain.body_list);
     [K, S] = assemble_rankine_matrix(geom.total_panels, geom.centers, geom.normals, geom.vertices, ...
         domain.stats, omega, gravity, domain.cfg);
-    phi = solve_complex_system(K, S * (1i * omega * nj));
+    [rhs, ~, radiationRHSInfo] = build_rankine_radiation_rhs( ...
+        S, omega, nj, 1:size(nj, 2));
+    phi = solve_complex_system(K, rhs);
     phi_body = phi(1:nb, :);
     [A, B, diagnostics] = compute_hydrodynamic_coeffs(phi_body, nj, geom.areas(1:nb), omega, rho);
     result = struct('omega', omega,'phi', phi,'phi_body', phi_body,'added_mass', A, ...
 'damping', B,'generalized_normals', nj,'diagnostics', diagnostics);
+    result.radiation_rhs_info = radiationRHSInfo;
 end

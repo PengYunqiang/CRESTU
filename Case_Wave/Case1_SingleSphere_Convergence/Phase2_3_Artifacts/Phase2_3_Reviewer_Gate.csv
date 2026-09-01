@@ -1,0 +1,4 @@
+review_scope,status,blocker_count,conclusion
+normal_lineage_and_boundary_mask,PASS,0,"Active 272-panel in-memory FARFIELD tail mask, four normal definitions, transition exclusion, node equivalence IDs, and structured seam connectivity verified."
+hankel_formula_and_preassembly_operator,PASS,0,"Production complex-kappa coefficient oracle and physical-k legacy scaling verified; all-FARFIELD assembled matrix oracle remains a mandatory post-assembly check."
+postassembly_all_farfield_and_focused_case,PASS,0,"All 272 FARFIELD columns close D_canonical+gamma_j*S at machine precision; focused omega=1.5 runtime/algebraic solve passes; formal sweep and WAMIT remain not run."

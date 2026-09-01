@@ -200,18 +200,193 @@ function cfg = read_config(config_file)
             cfg.fs.sponge_ratio <= 0 || cfg.fs.mu0 < 0
         error('CRESTU:InvalidDomainParameters','PARA9/PARA10 parameters are invalid.');
     end
+    cfg.phase2_2_controls = parse_phase2_2_controls(sections, cfg.fs);
+    if cfg.phase2_2_controls.persistFullSolutions && cfg.run.ipoten ~= 1
+        error('CRESTU:Phase22DiagnosticCleanRequired', ...
+            ['PERSIST_FULL_PHI is a clean-recompute diagnostic only and ', ...
+            'requires IPOTEN=1; cache reload cannot overwrite it.']);
+    end
 
     cfg.files.fs = fullfile(cfg.config_dir, sprintf('%s_fs.bmf', cfg.case_name));
     cfg.files.seabed = fullfile(cfg.config_dir, sprintf('%s_seabed.bmf', cfg.case_name));
     cfg.files.farfield = fullfile(cfg.config_dir, sprintf('%s_farfield.bmf', cfg.case_name));
     cfg.files.potential_cache = fullfile(cfg.config_dir, sprintf('%s_PotCache.mat', cfg.case_name));
     cfg.files.results = fullfile(cfg.config_dir, sprintf('%s_Results.mat', cfg.case_name));
+    cfg.files.raw_diagnostics = fullfile(cfg.config_dir, ...
+        sprintf('%s_RawDiagnostics.mat', cfg.case_name));
+    cfg.files.physical_diagnostics = fullfile(cfg.config_dir, ...
+        sprintf('%s_PhysicalDiagnostics.mat', cfg.case_name));
     cfg.outer_reference_mesh_file = parse_outer_reference_mesh(sections, cfg.config_dir);
+    cfg.outer_truncation = parse_outer_truncation(sections);
     fprintf('[OK] Loaded %s\n', config_file);
     fprintf('    Case=%s, IPOTEN=%d, IFORCE=%d, IRAD=%d, IDIFF=%d, IDRIFT=%d\n', cfg.case_name, ...
         cfg.run.ipoten, cfg.run.iforce, cfg.run.irad, cfg.run.idiff, cfg.run.idrift);
     fprintf('    Bodies=%d, frequencies=%d, headings=%d, depth=%.3g m\n', ...
         cfg.n_bodies, cfg.freq.nfreq, cfg.wave.ndir, cfg.water_depth);
+end
+
+function controls = parse_phase2_2_controls(sections, legacyFs)
+% PARSE_PHASE2_2_CONTROLS Read optional, named Phase-2.2 audit controls.
+% An absent PARA13 reproduces every legacy domain and sponge input exactly.
+
+    controls = struct( ...
+        'schemaVersion', 1, ...
+        'sectionPresent', false, ...
+        'inputMode', 'legacy-absent', ...
+        'fsRadialCounts', [legacyFs.nr_near, legacyFs.nr_sponge], ...
+        'bottomRadialCounts', [legacyFs.nr_near, legacyFs.nr_sponge], ...
+        'outerVerticalPanelCount', legacyFs.nz_farfield, ...
+        'outerThetaPanelCount', 0, ...
+        'freeSurfaceOuterThetaPanelCount', 0, ...
+        'bottomOuterThetaPanelCount', 0, ...
+        'meshTransitionRadiusM', legacyFs.r_inner, ...
+        'spongeStartRadiusM', legacyFs.r_inner, ...
+        'spongeWidthMode', 'inherit-active-outer-minus-start', ...
+        'spongeWidthM', NaN, ...
+        'spongeMuPolicy', 'legacy-floor', ...
+        'spongeMu0', legacyFs.mu0, ...
+        'spongeAutoTuneEnabled', true, ...
+        'rawDiagnosticsEnabled', false, ...
+        'persistFullSolutions', false);
+    if ~isfield(sections, 'PARA13')
+        return
+    end
+    assert(~isempty(sections.PARA13), 'CRESTU:Phase22ControlShape', ...
+        'PARA13 must contain at least one named Phase-2.2 control record.');
+    controls.sectionPresent = true;
+    controls.inputMode = 'explicit-PARA13';
+    seen = struct();
+    autoTuneWasSpecified = false;
+    for lineIndex = 1:numel(sections.PARA13)
+        tokens = regexp(strtrim(sections.PARA13{lineIndex}), '\s+', 'split');
+        key = upper(tokens{1});
+        safeKey = matlab.lang.makeValidName(lower(key));
+        assert(~isfield(seen, safeKey), 'CRESTU:Phase22ControlDuplicate', ...
+            'PARA13 contains duplicate record %s.', key);
+        seen.(safeKey) = true;
+        switch key
+            case 'FS_RADIAL_COUNTS'
+                controls.fsRadialCounts = parse_positive_integer_pair(tokens, key);
+            case 'BOTTOM_RADIAL_COUNTS'
+                controls.bottomRadialCounts = parse_positive_integer_pair(tokens, key);
+            case 'OUTER_VERTICAL_COUNT'
+                controls.outerVerticalPanelCount = parse_named_positive_integer(tokens, key);
+            case 'OUTER_THETA_COUNT'
+                controls.outerThetaPanelCount = parse_named_positive_integer(tokens, key);
+            case 'FS_OUTER_THETA_COUNT'
+                controls.freeSurfaceOuterThetaPanelCount = ...
+                    parse_named_positive_integer(tokens, key);
+            case 'BOTTOM_OUTER_THETA_COUNT'
+                controls.bottomOuterThetaPanelCount = ...
+                    parse_named_positive_integer(tokens, key);
+            case 'MESH_TRANSITION_RADIUS'
+                controls.meshTransitionRadiusM = parse_named_positive_scalar(tokens, key);
+            case 'SPONGE_START_RADIUS'
+                controls.spongeStartRadiusM = parse_named_positive_scalar(tokens, key);
+            case 'SPONGE_WIDTH'
+                controls.spongeWidthM = parse_named_positive_scalar(tokens, key);
+                controls.spongeWidthMode = 'explicit';
+            case 'SPONGE_MU_POLICY'
+                assert(numel(tokens) == 2, 'CRESTU:Phase22ControlSyntax', ...
+                    '%s requires one value: LEGACY_FLOOR or EXPLICIT.', key);
+                policy = upper(tokens{2});
+                assert(any(strcmp(policy, {'LEGACY_FLOOR', 'EXPLICIT'})), ...
+                    'CRESTU:Phase22ControlMuPolicy', ...
+                    'SPONGE_MU_POLICY must be LEGACY_FLOOR or EXPLICIT.');
+                controls.spongeMuPolicy = lower(strrep(policy, '_', '-'));
+            case 'SPONGE_MU0'
+                controls.spongeMu0 = parse_named_nonnegative_scalar(tokens, key);
+            case 'SPONGE_AUTO_TUNE'
+                controls.spongeAutoTuneEnabled = parse_named_flag(tokens, key);
+                autoTuneWasSpecified = true;
+            case 'RAW_DIAGNOSTICS'
+                controls.rawDiagnosticsEnabled = parse_named_flag(tokens, key);
+            case 'PERSIST_FULL_PHI'
+                controls.persistFullSolutions = parse_named_flag(tokens, key);
+            otherwise
+                error('CRESTU:Phase22ControlName', ...
+                    'Unknown PARA13 Phase-2.2 control %s.', key);
+        end
+    end
+    if strcmp(controls.spongeMuPolicy, 'explicit') && ~autoTuneWasSpecified
+        controls.spongeAutoTuneEnabled = false;
+    end
+    assert(~strcmp(controls.spongeMuPolicy, 'explicit') || ...
+        ~controls.spongeAutoTuneEnabled, 'CRESTU:Phase22ControlMuConflict', ...
+        'EXPLICIT sponge mu requires SPONGE_AUTO_TUNE 0.');
+    assert(~controls.persistFullSolutions || controls.rawDiagnosticsEnabled, ...
+        'CRESTU:Phase22ControlDiagnostics', ...
+        'PERSIST_FULL_PHI 1 requires RAW_DIAGNOSTICS 1.');
+end
+
+function values = parse_positive_integer_pair(tokens, key)
+    assert(numel(tokens) == 3, 'CRESTU:Phase22ControlSyntax', ...
+        '%s requires exactly two positive integer values.', key);
+    values = [parse_scalar(tokens{2}, key), parse_scalar(tokens{3}, key)];
+    assert(all(values >= 1 & fix(values) == values), ...
+        'CRESTU:Phase22ControlInteger', '%s values must be positive integers.', key);
+end
+
+function value = parse_named_positive_integer(tokens, key)
+    value = parse_named_positive_scalar(tokens, key);
+    assert(fix(value) == value, 'CRESTU:Phase22ControlInteger', ...
+        '%s must be a positive integer.', key);
+end
+
+function value = parse_named_positive_scalar(tokens, key)
+    assert(numel(tokens) == 2, 'CRESTU:Phase22ControlSyntax', ...
+        '%s requires exactly one positive value.', key);
+    value = parse_scalar(tokens{2}, key);
+    assert(value > 0, 'CRESTU:Phase22ControlPositive', ...
+        '%s must be positive.', key);
+end
+
+function value = parse_named_nonnegative_scalar(tokens, key)
+    assert(numel(tokens) == 2, 'CRESTU:Phase22ControlSyntax', ...
+        '%s requires exactly one nonnegative value.', key);
+    value = parse_scalar(tokens{2}, key);
+    assert(value >= 0, 'CRESTU:Phase22ControlNonnegative', ...
+        '%s must be nonnegative.', key);
+end
+
+function value = parse_named_flag(tokens, key)
+    assert(numel(tokens) == 2, 'CRESTU:Phase22ControlSyntax', ...
+        '%s requires one flag (0 or 1).', key);
+    parsed = parse_scalar(tokens{2}, key);
+    assert(parsed == 0 || parsed == 1, 'CRESTU:Phase22ControlFlag', ...
+        '%s must be 0 or 1.', key);
+    value = logical(parsed);
+end
+
+function specification = parse_outer_truncation(sections)
+% PARSE_OUTER_TRUNCATION Read the optional Phase-2.2 truncation audit input.
+
+    specification = struct('enabled', false, ...
+        'topRadiusPerWavelength', 1.5, ...
+        'bottomRadiusPerWavelength', 1.5, ...
+        'inputMode', 'legacy-absent', ...
+        'minimumRadiusPerWavelength', 1.5);
+    if ~isfield(sections, 'PARA12')
+        return
+    end
+    assert(numel(sections.PARA12) == 1, ...
+        'CRESTU:OuterTruncationShape', ...
+        'PARA12 requires exactly one OUTER_TRUNCATION_Q record.');
+    tokens = regexp(strtrim(sections.PARA12{1}), '\s+', 'split');
+    assert(numel(tokens) == 3 && strcmpi(tokens{1}, 'OUTER_TRUNCATION_Q'), ...
+        'CRESTU:OuterTruncationSyntax', ...
+        'PARA12 syntax is: OUTER_TRUNCATION_Q q_top q_bottom.');
+    topQ = parse_scalar(tokens{2}, 'PARA12 top truncation q');
+    bottomQ = parse_scalar(tokens{3}, 'PARA12 bottom truncation q');
+    assert(isfinite(topQ) && isfinite(bottomQ) && ...
+        topQ >= specification.minimumRadiusPerWavelength && ...
+        bottomQ >= specification.minimumRadiusPerWavelength, ...
+        'CRESTU:OuterTruncationRange', ...
+        'PARA12 q_top and q_bottom must both be finite and >= 1.5.');
+    specification.enabled = true;
+    specification.topRadiusPerWavelength = topQ;
+    specification.bottomRadiusPerWavelength = bottomQ;
+    specification.inputMode = 'explicit-PARA12';
 end
 
 function meshFilename = parse_outer_reference_mesh(sections, configDirectory)

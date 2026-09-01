@@ -1,0 +1,6 @@
+layer,metric,wide_bracket_low_rad_s,center_rad_s,wide_bracket_high_rad_s,wide_or_coarse_deviation,dense_bracket_low_rad_s,dense_bracket_high_rad_s,dense_deviation,threshold,dense_status,interpretation
+POTENTIAL,body_phi3_complex_vector,0.54,0.60,0.66,0.638471104052371,0.59,0.61,0.0363020109802523,0.5,PASS,wide-bracket curvature is already present in solved potential but resolves as dense-local continuous
+RAW_FORCE,F33_rad_complex,0.54,0.60,0.66,0.583604342615746,0.59,0.61,0.0329376408975507,0.5,PASS,raw generalized force is dense-local continuous and panel reconstruction matches production
+AB_EXTRACTION,A33,0.50,0.60,0.70,0.734631341570594,0.59,0.61,0.0245618127883018,0.5,PASS,coarse formal curvature is a sampling false positive and extraction adds no discontinuity
+AB_EXTRACTION,B33,0.50,0.60,0.70,0.596420376462823,0.59,0.61,0.0375285514277176,0.5,PASS,coarse formal curvature is a sampling false positive and extraction adds no discontinuity
+DYNAMIC_RESPONSE,RAO3_complex,1.30,1.40,1.50,0.675183131624015,1.30,1.50,0.346085986548557,0.5,PASS,dense complex response is continuous around a finite physical-resonance denominator minimum
