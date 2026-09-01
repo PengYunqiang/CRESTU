@@ -1,0 +1,7 @@
+fixture,expected_behavior,panel_count,expected_aspect_ratio,actual_maximum_aspect_ratio,expected_minimum_angle_deg,actual_minimum_angle_deg,expected_total_area_m2,actual_total_area_m2,expected_minimum_orientation_alignment,actual_minimum_orientation_alignment,expected_duplicate_panel_count,actual_duplicate_panel_count,expected_median_characteristic_h_m,actual_median_characteristic_h_m,test_pass
+regular_triangle,ACCEPTED_REFERENCE,1,1,1,60,60,0.433012701892219,0.433012701892219,1,1,0,0,0.658037006476246,0.658037006476246,1
+square_quad,ACCEPTED_REFERENCE,1,1,1,90,90,1,1,1,1,0,0,1,1,1
+rectangle_10_to_1,ASPECT_RATIO_FAIL,1,10,10,90,90,10,10,1,1,0,0,3.16227766016838,3.16227766016838,1
+sliver_triangle,MINIMUM_ANGLE_FAIL,1,995.037190209989,995.037190209989,0.0057353132454168,0.0057353132317232,5e-05,5e-05,1,1,0,0,0.00707106781186548,0.00707106781186548,1
+reversed_panel,REVERSED_ORIENTATION_DETECTED,1,1,1,90,90,1,1,-1,-1,0,0,1,1,1
+duplicate_panel,DUPLICATE_DETECTED,2,1,1,90,90,2,2,1,1,1,1,1,1,1
