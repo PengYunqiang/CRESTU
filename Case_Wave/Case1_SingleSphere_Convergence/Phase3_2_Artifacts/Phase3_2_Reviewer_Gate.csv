@@ -1,14 +1,14 @@
 checkID,reviewItem,reviewStatus,blockerCount,evidence,notes
 1,three distinct mesh levels,PASS,0,Phase3_2_Mesh_Manifest.csv,
-2,body FS bottom FARFIELD all change,PASS,0,Phase3_2_Mesh_Control_Isolation.csv,
-3,outer physical extent fixed per frequency,PASS,0,Phase3_2_Mesh_Manifest.csv,
+2,body FS bottom FARFIELD all change,PASS,0,Phase3_2_Mesh_Control_Isolation.csv,REGION_CONTROL_ACTIVATION=PASS
+3,outer physical extent fixed per frequency,PASS,0,Phase3_2_Mesh_Manifest.csv,OUTER_EXTENT_ISOLATION=PASS
 4,no original-repository runtime path,PASS,0,Phase3_2_Runtime_Path_Resolution.csv,
 5,no stale cache reuse,PASS,0,no BEM/cache was run,
 6,gate versions and original FAIL preserved,PASS,0,v1-v4 gates and V1/V3 CSV,
 7,complex GCI not misapplied,NOT_RUN,0,Phase3_2_Formal_Convergence.csv NOT_RUN,
 8,resonance not judged from single point,NOT_RUN_BLOCKED,0,Phase3_2_Resonance_Tracking.csv,
-9,nonmonotonic/quality FAIL not hidden,PASS,0,V1/V3/current quality CSV,
+9,nonmonotonic/quality FAIL not hidden,PASS,0,V1/V3/current quality CSV,base polar topology=PRIMARY_DESIGN_LIMITATION; root cause not yet unique
 10,no WAMIT-driven physics tuning,PASS,0,no WAMIT response comparison executed,
-11,reports consistent with raw CSV,PASS,0,Phase3_2_Final_Status.csv,
+11,reports consistent with raw CSV,PASS,0,Phase3_2_Final_Status.csv,quality rows total/pass/fail=72/36/36
 12,production-ready claim not exceeded,PASS,0,READY_FOR_PRODUCTION=NO,
 BLOCKER-1,base FS/bottom mesh quality prevents authorized BEM sweep,BLOCKER,1,Phase3_2_Mesh_Quality.csv;PHASE3_2_V3_MESH_FAMILY_FAILURE_CN.md,requires separately scoped base-mesh topology redesign

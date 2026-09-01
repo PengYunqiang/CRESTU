@@ -4,7 +4,16 @@
 PHASE3_2_OVERALL = BLOCKED
 RUNTIME_PROVENANCE_GATE = PASS
 Q_ONLY_LEGACY_GEOMETRY_REGRESSION = PASS_EXACT_HASH
+REGION_CONTROL_ACTIVATION = PASS
+OUTER_EXTENT_ISOLATION = PASS
+LEGACY_Q_ONLY_REGRESSION = PASS
+MONOTONIC_REFINEMENT_FAMILY = FAIL
+MESH_QUALITY_GATE = FAIL
 MESH_CONTROL_ISOLATION = FAIL
+COMPONENT_QUALITY_ROWS_TOTAL = 72
+COMPONENT_QUALITY_ROWS_PASS = 36
+COMPONENT_QUALITY_ROWS_FAIL = 36
+BASE_POLAR_TOPOLOGY_CLASSIFICATION = PRIMARY_DESIGN_LIMITATION
 MESH_GEOMETRY_GATE = FAIL
 ALGEBRAIC_GATE = NOT_RUN_BLOCKED
 SENTINEL_CONVERGENCE = NOT_RUN_BLOCKED
@@ -23,9 +32,9 @@ MATLAB R2023b runtime/function provenance 通过；历史 q-only 1.5R geometry �
 
 ## Blocker
 
-v1–v4 的原始 FAIL 均保留。v4 有 36 个 component quality rows 未通过；低频 FS 最大 aspect ratio 达 122.202，bottom/FS 最小角低于冻结 35 deg。0.5 rad/s transition median h 也未形成严格三层下降。根因已落到 base polar FS/bottom topology，继续处理需要另行授权的 generator redesign。
+v1–v4 的原始 FAIL 均保留。v4 共 72 个 component quality rows，其中 36 PASS、36 FAIL；低频 FS 最大 aspect ratio 达 122.202，bottom/FS 最小角达 4.77835 deg，低于冻结 35 deg。0.5 rad/s transition median h 也未形成严格三层下降。当前把 base polar FS/bottom topology 记为 PRIMARY_DESIGN_LIMITATION；在 analytic metric fixtures 与 panel-level generator audit 完成前，不把它写成唯一已确认 root cause。
 
-v1–v4 的原始 FAIL 均保留。v4 有 4.778345e+00 个 component quality rows 未通过；低频 FS 最大 aspect ratio 达 ## 未运行项目
+## 未运行项目
 
 按 fail-early 规则，没有组装 Rankine matrix，没有产生 A33/B33/F3/RAO3/D3、condition/residual、resonance 或 formal response。对应 CSV 明确写 `NOT_RUN_BLOCKED`；没有 figures，因为不存在可合法绘制的新响应数据。
 

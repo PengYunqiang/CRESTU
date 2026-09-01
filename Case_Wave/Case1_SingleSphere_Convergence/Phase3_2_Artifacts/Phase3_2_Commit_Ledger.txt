@@ -1,4 +1,4 @@
-captured_head=d23aa006be9e4ffecd7d6a2e3a6fb5734ead9bda
+captured_head=b69b9ec336a423c33735a6b3a992e898c8c53f40
 checkpoint=7f2d391d1b42366fdb04e1b493439dab438584eb
 note=The subsequent audit-only commit containing this file is not self-listed.
 
@@ -9,3 +9,4 @@ a19c0a96bb1f1f0a28de3d7f6ce309a2af19fe9c|phase3.2: add explicit-theta gradual me
 b1eab6c83f76d2ae90b8f80f7b33050408c6c699|phase3.2: verify exact legacy mesh regression
 1acd82b4f2a79b436487631d736084e13ca99996|phase3.2: preserve v3 failure and predeclare v4 family
 d23aa006be9e4ffecd7d6a2e3a6fb5734ead9bda|phase3.2: add blocked mesh evidence and independent review
+b69b9ec336a423c33735a6b3a992e898c8c53f40|phase3.2: add final git and file hygiene audits
