@@ -1,0 +1,4 @@
+statusName,statusValue,evidence
+MESH_GEOMETRY_GATE,FAIL,Phase3_2_Mesh_Manifest.csv;Phase3_2_Mesh_Quality.csv
+MESH_CONTROL_ISOLATION_GEOMETRY,PASS,Phase3_2_Mesh_Control_Isolation.csv
+OPERATOR_HASH_ISOLATION,PENDING_SENTINEL_ASSEMBLY,requires clean sentinel BEM assembly
