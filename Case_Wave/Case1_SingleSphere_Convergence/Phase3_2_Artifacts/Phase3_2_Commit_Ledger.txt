@@ -1,0 +1,11 @@
+captured_head=d23aa006be9e4ffecd7d6a2e3a6fb5734ead9bda
+checkpoint=7f2d391d1b42366fdb04e1b493439dab438584eb
+note=The subsequent audit-only commit containing this file is not self-listed.
+
+55643e420374920796ae00a9c2ff9e204dfef4f4|phase3.2: add baseline provenance and predeclared mesh plan
+bd0816a04f81b6b719b6bd189a41a287229a6209|phase3.2: add coordinated mesh family and sentinel harness
+28413f1b4843f306b1e6063fa358557b541cc1c2|phase3.2: preserve v1 mesh failure and predeclare v2 family
+a19c0a96bb1f1f0a28de3d7f6ce309a2af19fe9c|phase3.2: add explicit-theta gradual mesh transition
+b1eab6c83f76d2ae90b8f80f7b33050408c6c699|phase3.2: verify exact legacy mesh regression
+1acd82b4f2a79b436487631d736084e13ca99996|phase3.2: preserve v3 failure and predeclare v4 family
+d23aa006be9e4ffecd7d6a2e3a6fb5734ead9bda|phase3.2: add blocked mesh evidence and independent review
