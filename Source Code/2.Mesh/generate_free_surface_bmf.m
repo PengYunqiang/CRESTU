@@ -49,6 +49,15 @@ function mesh_fs = generate_free_surface_bmf(filename, waterline, cfg, writeOutp
     is_closed = waterline.is_closed;
     nr_total = nr_near + nr_sponge;
 
+    if get_polar_topology_mode(cfg) == "QUALITY_CONTROLLED_V2"
+        mesh_fs = generate_quality_controlled_polar_surface( ...
+            waterline, cfg, 0.0, 2);
+        if writeOutput
+            write_bmf(filename, mesh_fs);
+        end
+        return
+    end
+
 % =====================================================================
 % =====================================================================
     seg_lens = zeros(n_pts, 1);

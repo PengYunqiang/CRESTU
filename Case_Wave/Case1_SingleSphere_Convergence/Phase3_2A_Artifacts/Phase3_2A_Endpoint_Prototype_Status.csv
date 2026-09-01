@@ -1,0 +1,6 @@
+statusName,statusValue,evidence
+ENDPOINT_COMPONENT_QUALITY,PASS,Phase3_2A_Endpoint_Prototype_Quality.csv
+ENDPOINT_TOPOLOGY,PASS,Phase3_2A_Endpoint_Prototype_Manifest.csv
+ENDPOINT_CONTROL_ISOLATION,PASS,Phase3_2A_Endpoint_Prototype_Control_Isolation.csv
+LEGACY_Q_ONLY_REGRESSION,PASS_EXACT_HASH_5_OF_5,Phase3_2A_Legacy_Regression.csv
+ENDPOINT_PROTOTYPE_OVERALL,PASS,all endpoint hard gates
