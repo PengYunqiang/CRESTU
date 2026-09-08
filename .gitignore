@@ -103,6 +103,26 @@ fortran.*
 *~
 
 # ==========================================
+# CRESTU release examples and validation outputs
+# ==========================================
+examples/**/results/
+examples/**/outputs/
+examples/**/cache/
+examples/**/logs/
+examples/**/*_PotCache.mat
+examples/**/*_Results.mat
+examples/**/*_RunRecord.mat
+examples/**/*_MeshAudit.csv
+examples/**/*_fs.bmf
+examples/**/*_seabed.bmf
+examples/**/*_farfield.bmf
+validation/**/outputs/
+validation/**/cache/
+validation/**/logs/
+fixed-import-manifest.csv
+PROJECT_REPOSITORY_WORKTREE_AUDIT_CN_*.md
+
+# ==========================================
 # 9. 强力隔离：指定“纯输出/算例运行”文件夹 (推荐)
 # 只要放入这些名字的文件夹，里面无论有没有后缀一律不同步
 # ==========================================
