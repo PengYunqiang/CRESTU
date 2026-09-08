@@ -32,7 +32,7 @@ The minimal case was executed in real MATLAB R2023b. It built the 1,848-panel do
 | Canonical examples | many historical cases | 1 single-sphere example with smoke/full configs |
 | Absolute paths in active source/entry points | historical Phase 3 scripts contained them | 0 found in active source/runtime scan |
 
-The first cleanup commit removed 415 tracked historical/generated files and added the portable entry points and release documentation. The research material and generated smoke outputs were moved to `E:\CRESTU-1F_v1.0_20260824\Archive\CRESTU-ReleaseArchive-20260908` with a 2,045-file archive and SHA-256 manifest.
+The first cleanup commit removed 415 tracked historical/generated files and added the portable entry points and release documentation. The research material and generated smoke outputs were moved to `E:\CRESTU-1F_v1.0_20260824\Archive\CRESTU-ReleaseArchive-20260908` with a 2,048-file archive and SHA-256 manifest.
 
 ## 3. Canonical baseline and Git history
 
