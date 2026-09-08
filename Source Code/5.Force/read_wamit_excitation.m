@@ -50,7 +50,7 @@ function reference = read_wamit_excitation(filename, rho, g, wave_amplitude, cha
         headingIndex = find(headings == raw(rowIndex, 2), 1);
         mode = raw(rowIndex, 3);
         coefficient(mode, headingIndex, k) = complex(raw(rowIndex, 6), raw(rowIndex, 7));
-        scale = rho * g * wave_amplitude * characteristic_length^(2 + (mode > 3));
+        scale = rho * g * wave_amplitude * characteristic_length^(2 + (mod(mode-1,6) >= 3));
         value(mode, headingIndex, k) = scale * coefficient(mode, headingIndex, k);
     end
     reference = struct('file', filename,'periods', periods(:).','omegas', 2 * pi ./ periods(:).', ...

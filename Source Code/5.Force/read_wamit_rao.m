@@ -1,4 +1,4 @@
-function reference = read_wamit_rao(filename)
+function reference = read_wamit_rao(filename, ulen)
 % READ_WAMIT_RAO Read wamit rao for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
@@ -24,6 +24,8 @@ function reference = read_wamit_rao(filename)
 
 %% Stage 1: Validate Inputs and Initialize the Algorithm
 
+    if nargin < 2 || isempty(ulen), ulen = 1; end
+    validateattributes(ulen, {'numeric'}, {'scalar','real','positive','finite'});
     raw = readmatrix(filename,'FileType','text');
     if size(raw, 2) < 7
         error('CRESTU:WamitFormat','Expected seven columns in %s.', filename);
@@ -38,7 +40,7 @@ function reference = read_wamit_rao(filename)
         k = find(periods == raw(rowIndex, 1), 1);
         headingIndex = find(headings == raw(rowIndex, 2), 1);
         mode = raw(rowIndex, 3);
-        value(mode, headingIndex, k) = complex(raw(rowIndex, 6), raw(rowIndex, 7));
+        value(mode, headingIndex, k) = complex(raw(rowIndex, 6), raw(rowIndex, 7)) / ulen^(mod(mode-1,6)>=3);
     end
     reference = struct('file', filename,'periods', periods(:).','omegas', 2 * pi ./ periods(:).', ...
 'headings', headings(:).','complex', value,'amplitude', abs(value),'phase_deg', angle(value) * 180 / pi);

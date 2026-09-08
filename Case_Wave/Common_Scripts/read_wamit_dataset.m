@@ -55,7 +55,7 @@ function dataset = read_wamit_dataset(folder, characteristic_length)
 'drift_pressure', [],'files', struct());
 
     dataset.files.one = find_extension_file(folder,'1', true);
-    dataset.radiation = read_wamit_first_order(dataset.files.one, metadata.density);
+    dataset.radiation = read_wamit_first_order(dataset.files.one, metadata.density, metadata.length_scale);
 
     dataset.files.two = find_extension_file(folder,'2', false);
     if ~isempty(dataset.files.two)
@@ -64,12 +64,14 @@ function dataset = read_wamit_dataset(folder, characteristic_length)
     end
     dataset.files.three = find_extension_file(folder,'3', false);
     if ~isempty(dataset.files.three)
+        % Legacy field name: .3 is TOTAL excitation by diffraction pressure,
+        % not the isolated scattered/FK-subtracted force. Keep API compatible.
         dataset.scattering = read_wamit_excitation(dataset.files.three, metadata.density, ...
             metadata.gravity, 1, metadata.length_scale);
     end
     dataset.files.four = find_extension_file(folder,'4', false);
     if ~isempty(dataset.files.four)
-        dataset.rao = read_wamit_rao(dataset.files.four);
+        dataset.rao = read_wamit_rao(dataset.files.four, metadata.length_scale);
     end
     dataset.files.eight = find_extension_file(folder,'8', false);
     if ~isempty(dataset.files.eight)
@@ -113,8 +115,10 @@ function filename = find_extension_file(folder, extension, required)
         filename ='';
         return
     end
-    [~, selected] = min([candidates.bytes]);
-    filename = fullfile(candidates(selected).folder, candidates(selected).name);
+    assert(numel(candidates) == 1, 'CRESTU:AmbiguousWamitReference', ...
+        'Expected one .%s file in %s, found %d. Select a unique reference folder.', ...
+        extension, folder, numel(candidates));
+    filename = fullfile(candidates(1).folder, candidates(1).name);
 end
 
 function value = extract_scalar(text, expression, default_value)

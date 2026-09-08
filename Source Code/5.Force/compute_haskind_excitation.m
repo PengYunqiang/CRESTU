@@ -40,14 +40,20 @@ function force = compute_haskind_excitation(phi_radiation, nj, centers, normals,
     if nargin < 9 || isempty(mode_parity)
         mode_parity = get_mode_parities(cfg.n_bodies, cfg.isx, cfg.isy);
     end
+    validateattributes(omega, {'numeric'}, {'scalar','real','positive','finite'});
+    % n_B is OUT of the body (INTO the fluid); Phi_R is unit displacement.
+    % psi=Phi_R/(i*w), dpsi/dn_B=n_j. Reciprocity gives
+    % F_j = +i*rho*w * int[n_j*Phi_I - psi_j*dPhi_I/dn_B] dS.
+    % Do not transplant WAMIT's outside minus sign: its n=-n_B.
     psi = phi_radiation / (1i * omega);
     for j = 1:ndof
         parity = mode_parity(j, :);
         for headingIndex = 1:nh
             [phi_I, dphi_I] = decompose_incident_wave_symmetry(centers, normals, omega, cfg.grav, ...
                 cfg.water_depth, headings(headingIndex), 1, cfg.isx, cfg.isy, parity);
-            integral = sum((nj(:, j) .* phi_I + psi(:, j) .* dphi_I) .* areas);
-            force(j, headingIndex) = -1i * omega * cfg.rho * cfg.symmetry.multiplicity * integral;
+            integral = sum((nj(:, j) .* phi_I - psi(:, j) .* dphi_I) .* areas);
+            force(j, headingIndex) = 1i * omega * cfg.rho * ...
+                double(cfg.symmetry.multiplicity) * integral;
         end
     end
 end

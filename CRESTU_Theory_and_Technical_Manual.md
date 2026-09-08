@@ -1,3 +1,5 @@
+> **2026-09-05 一阶修复版说明**：本轮一阶符号、BIE、压力积分、Haskind 和归一化的勘误以 [FIRST_ORDER_CONVENTIONS.md](FIRST_ORDER_CONVENTIONS.md) 为准。正式 B 保持 pressure-integrated damping；Python 独立复现已有 fresh 数值，MATLAB fresh 验收尚待执行。旧正文中不一致的一阶公式/验证结论不构成本轮证据。
+
 # CRESTU 理论与技术参考手册
 
 **适用源码基线：** `Source Code/` 下 55 个 MATLAB 文件（2026-08-25 规范化版本）  

@@ -1,4 +1,4 @@
-function reference = read_wamit_first_order(file_one, rho)
+function reference = read_wamit_first_order(file_one, rho, ulen)
 % READ_WAMIT_FIRST_ORDER Read wamit first order for the CRESTU hydrodynamic workflow.
 %
 % Syntax:
@@ -25,10 +25,17 @@ function reference = read_wamit_first_order(file_one, rho)
 
 %% Stage 1: Validate Inputs and Initialize the Algorithm
 
+    if nargin < 3 || isempty(ulen), ulen = 1; end
+    validateattributes(ulen, {'numeric'}, {'scalar','real','positive','finite'});
+    validateattributes(rho, {'numeric'}, {'scalar','real','positive','finite'});
     raw = readmatrix(file_one,'FileType','text');
     if size(raw, 2) < 5
         error('CRESTU:WamitFormat','Expected five columns in %s.', file_one);
     end
+    raw = raw(all(isfinite(raw(:,1:5)),2),:);
+    limitRecords = raw(raw(:,1)<=0,:); % PER<0: omega=0; PER=0: omega=Inf.
+    raw = raw(raw(:,1)>0,:); % Do not turn limit records into finite samples.
+    assert(~isempty(raw), 'CRESTU:WamitFinitePeriods', 'No finite positive-period data.');
     periods = unique(raw(:, 1),'stable');
     nf = numel(periods);
     ndof = max(max(raw(:, 2:3)));
@@ -39,9 +46,13 @@ function reference = read_wamit_first_order(file_one, rho)
         k = find(periods == raw(rowIndex, 1), 1);
         i = raw(rowIndex, 2);
         j = raw(rowIndex, 3);
-        A(i, j, k) = rho * raw(rowIndex, 4);
-        B(i, j, k) = rho * omegas(k) * raw(rowIndex, 5);
+        isRotationI = mod(i-1, 6) >= 3;
+        isRotationJ = mod(j-1, 6) >= 3;
+        scale = rho * ulen^(3 + isRotationI + isRotationJ);
+        A(i, j, k) = scale * raw(rowIndex, 4);
+        B(i, j, k) = scale * omegas(k) * raw(rowIndex, 5);
     end
     reference = struct('file', file_one,'periods', periods(:).','omegas', omegas, ...
-'added_mass', A,'damping', B,'rho', rho);
+'added_mass', A,'damping', B,'rho', rho,'ulen',ulen, ...
+'limit_records',limitRecords,'time_convention','exp(+i*omega*t)');
 end

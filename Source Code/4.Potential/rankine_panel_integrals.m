@@ -1,5 +1,5 @@
 function [potentialIntegral, normalDerivativeIntegral] = ...
-    rankine_panel_integrals(panelVerticesInput, fieldPoint, normal)
+    rankine_panel_integrals(panelVerticesInput, fieldPoint, normal, geometryTolerance)
 % RANKINE_PANEL_INTEGRALS Evaluate the analytic Rankine source and source-normal panel integrals.
 %
 % Syntax:
@@ -29,6 +29,12 @@ function [potentialIntegral, normalDerivativeIntegral] = ...
 
 %% Stage 1: Validate Inputs and Initialize the Algorithm
 
+    if nargin < 4 || isempty(geometryTolerance)
+        defaults = get_default_solver_options();
+        geometryTolerance = defaults.numerics.mesh.panelGeometryTolerance;
+    end
+    validateattributes(geometryTolerance, {'numeric'}, ...
+        {'scalar', 'real', 'positive', 'finite'});
     panelVertices = squeeze(panelVerticesInput);
     if size(panelVertices, 1) == 3 && size(panelVertices, 2) == 4
         panelVertices = panelVertices';
@@ -40,7 +46,7 @@ function [potentialIntegral, normalDerivativeIntegral] = ...
     panelTangentOne = panelVertices(2, :) - panelVertices(1, :);
     panelTangentOne = panelTangentOne - ...
         dot(panelTangentOne, panelNormal) * panelNormal;
-    if norm(panelTangentOne) < 1e-12
+    if norm(panelTangentOne) < geometryTolerance
         panelTangentOne = panelVertices(3, :) - panelVertices(2, :);
         panelTangentOne = panelTangentOne - ...
             dot(panelTangentOne, panelNormal) * panelNormal;
@@ -53,6 +59,12 @@ function [potentialIntegral, normalDerivativeIntegral] = ...
     localVertices = (panelVertices - panelCenter) * transformationMatrix';
     localFieldPoint = (fieldPoint - panelCenter) * transformationMatrix';
 
+    % Both kernels must use the SAME planar panel. For a warped quad, the
+    % edge formula below already projects to the centroid/diagonal-normal
+    % plane. Using the unprojected vertices only in the solid angle violates
+    % dG/dn_source = -dG/dn_field. Mid-edge planar approximation: WAMIT 15.3.
+    panelVertices = panelVertices - localVertices(:, 3) * panelNormal;
+
     localX = localFieldPoint(1);
     localY = localFieldPoint(2);
     localZ = localFieldPoint(3);
@@ -62,8 +74,6 @@ function [potentialIntegral, normalDerivativeIntegral] = ...
 
     potentialIntegral = 0.0;
     normalDerivativeIntegral = 0.0;
-    geometricTolerance = 1e-12;
-
     for k = 1:4
         vertexXOne = vertexX(k);
         vertexYOne = vertexY(k);
@@ -73,7 +83,7 @@ function [potentialIntegral, normalDerivativeIntegral] = ...
         edgeX = vertexXTwo - vertexXOne;
         edgeY = vertexYTwo - vertexYOne;
         edgeLength = sqrt(edgeX^2 + edgeY^2); % [m]
-        if edgeLength < geometricTolerance
+        if edgeLength < geometryTolerance
             continue;
         end
 
@@ -89,7 +99,7 @@ function [potentialIntegral, normalDerivativeIntegral] = ...
             (vertexYOne - localY) * edgeCosine; % [m]
 
         logarithmDenominator = distanceOne + distanceTwo - edgeLength;
-        if logarithmDenominator > geometricTolerance
+        if logarithmDenominator > geometryTolerance
             logarithmTerm = log((distanceOne + distanceTwo + edgeLength) / ...
                 logarithmDenominator);
             potentialIntegral = potentialIntegral + signedDistance * logarithmTerm;
@@ -99,7 +109,7 @@ function [potentialIntegral, normalDerivativeIntegral] = ...
 
 % Robust oriented solid angle.  For source-normal differentiation,
 % d/dn_y(1/|X-y|) is minus the oriented angle seen from X.
-    if abs(localZ) > geometricTolerance
+    if abs(localZ) > geometryTolerance
         vertexVectorOne = panelVertices(1, :) - fieldPoint;
         vertexVectorTwo = panelVertices(2, :) - fieldPoint;
         vertexVectorThree = panelVertices(3, :) - fieldPoint;
