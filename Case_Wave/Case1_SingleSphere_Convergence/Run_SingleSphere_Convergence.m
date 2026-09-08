@@ -60,7 +60,7 @@ function summary = Run_SingleSphere_Convergence(forceRecompute)
         outerRuntimeSeconds(levelIndex) = toc(timerIdentifier); % [s]
     end
 
-    %% 阶段 4: 执行几何、互易性、能量和网格收敛核查
+    %% 阶段 4: 执行几何、互易性、Haskind candidate 和网格收敛核查
 
     [sphereVerification, sphereDetails] = Verify_Sphere_Meshes( ...
         bodyMeshFilenames, levelNames, 5.0, paths.caseDirectory); % [m]
@@ -365,108 +365,16 @@ function comparisonTable = compare_clean_and_reload( ...
         cleanResult, reloadResult, outputDirectory)
 % COMPARE_CLEAN_AND_RELOAD Require machine-precision cache reproducibility.
 
-    fieldNames = {'A_raw', 'B_raw', 'A_reciprocal', 'B_reciprocal', ...
-        'damping_energy', 'excitation'};
-    comparisonNames = [fieldNames, {'rao_complex'}];
-    maximumAbsoluteDifference = zeros(numel(comparisonNames), 1);
-    machineTolerance = zeros(numel(comparisonNames), 1);
-    withinMachinePrecision = false(numel(comparisonNames), 1);
-
-    for fieldIndex = 1:numel(fieldNames)
-        [maximumAbsoluteDifference(fieldIndex), machineTolerance(fieldIndex)] = ...
-            compare_numeric_arrays(cleanResult.(fieldNames{fieldIndex}), ...
-            reloadResult.(fieldNames{fieldIndex}));
-        withinMachinePrecision(fieldIndex) = ...
-            maximumAbsoluteDifference(fieldIndex) <= machineTolerance(fieldIndex);
-    end
-
-    finalIndex = numel(comparisonNames);
-    [maximumAbsoluteDifference(finalIndex), machineTolerance(finalIndex)] = ...
-        compare_numeric_arrays(cleanResult.rao.complex, ...
-        reloadResult.rao.complex);
-    withinMachinePrecision(finalIndex) = ...
-        maximumAbsoluteDifference(finalIndex) <= machineTolerance(finalIndex);
-    comparisonTable = table(string(comparisonNames(:)), ...
-        maximumAbsoluteDifference, machineTolerance, withinMachinePrecision, ...
-        'VariableNames', {'field', 'maximumAbsoluteDifference', ...
-        'machineTolerance', 'withinMachinePrecision'});
-    comparisonFilename = fullfile(outputDirectory, ...
-        'Fine_Cache_Clean_Reload_Verification.csv');
-    writetable(comparisonTable, comparisonFilename);
-    disp(comparisonTable);
-    assert(all(withinMachinePrecision), 'CRESTU:CacheReloadPrecision', ...
-        'Fine clean recompute and cache reload differ beyond machine precision.');
-    fprintf('[OK] Fine clean/cache reload agrees to machine precision: %s\n', ...
-        comparisonFilename);
-end
-
-function [maximumDifference, tolerance] = compare_numeric_arrays( ...
-        firstArray, secondArray)
-% COMPARE_NUMERIC_ARRAYS Return maximum absolute difference and EPS tolerance.
-
-    assert(isequal(size(firstArray), size(secondArray)), ...
-        'CRESTU:CacheReloadShape', ...
-        'Clean and reload arrays have different dimensions.');
-    maximumDifference = max(abs(firstArray(:) - secondArray(:)));
-    valueScale = max([1.0; abs(firstArray(:)); abs(secondArray(:))]);
-    tolerance = 64.0 * eps(valueScale);
+    comparisonTable = write_schema7_clean_reload_verification( ...
+        cleanResult, reloadResult, outputDirectory);
 end
 
 function verificationTable = build_first_order_verification( ...
         levelNames, bodyResults, outerResults)
-% BUILD_FIRST_ORDER_VERIFICATION Export reciprocity, energy, and solve residuals.
+% BUILD_FIRST_ORDER_VERIFICATION Export explicit candidate diagnostics.
 
-    resultGroups = {'BodyMesh', 'OuterDomain'};
-    groupedResults = {bodyResults, outerResults};
-    rowCount = 2 * 3 * numel(bodyResults{1}.omegas);
-    study = strings(rowCount, 1);
-    level = strings(rowCount, 1);
-    omega = zeros(rowCount, 1); % [rad/s]
-    rawAReciprocityResidual = zeros(rowCount, 1);
-    rawBReciprocityResidual = zeros(rowCount, 1);
-    pressureEnergyMatrixResidual = zeros(rowCount, 1);
-    pressureEnergyB33Residual = zeros(rowCount, 1);
-    maxRadiationLinearResidual = zeros(rowCount, 1);
-    maxDiffractionLinearResidual = zeros(rowCount, 1);
-    rowIndex = 0;
-
-    for groupIndex = 1:2
-        results = groupedResults{groupIndex};
-
-        for levelIndex = 1:3
-            result = results{levelIndex};
-
-            for frequencyIndex = 1:numel(result.omegas)
-                rowIndex = rowIndex + 1;
-                study(rowIndex) = resultGroups{groupIndex};
-                level(rowIndex) = levelNames{levelIndex};
-                omega(rowIndex) = result.omegas(frequencyIndex);
-                rawAReciprocityResidual(rowIndex) = result.diagnostics( ...
-                    frequencyIndex).raw_added_mass_symmetry_error;
-                rawBReciprocityResidual(rowIndex) = result.diagnostics( ...
-                    frequencyIndex).raw_damping_symmetry_error;
-                pressureEnergyMatrixResidual(rowIndex) = result.diagnostics( ...
-                    frequencyIndex).pressure_energy_relative_residual;
-                pressureEnergyB33Residual(rowIndex) = result.diagnostics( ...
-                    frequencyIndex).B33_pressure_energy_relative_residual;
-                maxRadiationLinearResidual(rowIndex) = ...
-                    result.audit.frequencyEntries( ...
-                    frequencyIndex).maxRadiationLinearResidual;
-                maxDiffractionLinearResidual(rowIndex) = ...
-                    result.audit.frequencyEntries( ...
-                    frequencyIndex).maxDiffractionLinearResidual;
-            end
-        end
-    end
-
-    verificationTable = table(study, level, omega, ...
-        rawAReciprocityResidual, rawBReciprocityResidual, ...
-        pressureEnergyMatrixResidual, pressureEnergyB33Residual, ...
-        maxRadiationLinearResidual, maxDiffractionLinearResidual, ...
-        'VariableNames', {'study', 'level', 'omegaRadPerSecond', ...
-        'rawAReciprocityResidual', 'rawBReciprocityResidual', ...
-        'pressureEnergyMatrixResidual', 'pressureEnergyB33Residual', ...
-        'maxRadiationLinearResidual', 'maxDiffractionLinearResidual'});
+    verificationTable = build_schema7_first_order_verification( ...
+        levelNames, bodyResults, outerResults);
 end
 
 function auditTable = build_case_audit(levelNames, bodyResults, outerResults)
