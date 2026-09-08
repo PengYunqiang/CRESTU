@@ -1,7 +1,8 @@
 # CRESTU Repository Reorganization Report
 
 Date: 2026-09-08  
-Release branch during reorganization: `codex/release-20260908`  
+Canonical branch after reorganization: `main`  
+Release branch used during reorganization: `codex/release-20260908`  
 NextStep policy: `DO_NOT_TOUCH_NEXTSTEP = TRUE`
 
 ## 1. Result
@@ -23,15 +24,15 @@ The minimal case was executed in real MATLAB R2023b. It built the 1,848-panel do
 
 | Item | Before | Release tree after cleanup |
 |---|---:|---:|
-| Git worktrees | 2 | 2 during this turn; the Phase 3b worktree is ready for removal |
-| Local branches | 6 | 7 including the release branch; milestone branches remain explicit |
-| Tracked files | 540-ish historical/production files | 125 |
+| Git worktrees | 2 | 1 canonical worktree |
+| Local branches | 6 | 6; milestone branches remain explicit |
+| Tracked files | 540-ish historical/production files | 126 |
 | Non-ignored untracked files | 1,279 | 0 |
 | Ignored/untracked runtime output in release tree | hundreds | generated example output only, ignored |
 | Canonical examples | many historical cases | 1 single-sphere example with smoke/full configs |
 | Absolute paths in active source/entry points | historical Phase 3 scripts contained them | 0 found in active source/runtime scan |
 
-The first cleanup commit removed 415 tracked historical/generated files and added the portable entry points and release documentation. The research material was moved to `E:\CRESTU-1F_v1.0_20260824\Archive\CRESTU-ReleaseArchive-20260908` with a 2,039-file SHA-256 manifest.
+The first cleanup commit removed 415 tracked historical/generated files and added the portable entry points and release documentation. The research material was moved to `E:\CRESTU-1F_v1.0_20260824\Archive\CRESTU-ReleaseArchive-20260908` with a 2,040-file archive and SHA-256 manifest.
 
 ## 3. Canonical baseline and Git history
 
@@ -48,7 +49,8 @@ The protected Phase 3b branch was pushed before cleanup:
 
 ```text
 origin/phase3-2b-response-convergence -> 262892a
-origin/codex/release-20260908        -> 5cb2877
+origin/codex/release-20260908        -> 4dc3360
+origin/main                           -> 70fb3b9
 ```
 
 The old checkpoint, Phase 3.2, Phase 3.2a branches and tags remain available for historical recovery. They are not required by a fresh clone.
@@ -109,7 +111,7 @@ Historical `Case_Wave` convergence, old cases, Phase 2/3 artifacts, shadows, han
 
 - Fresh clone from `origin/codex/release-20260908`: PASS.
 - Fresh clone branch status: clean before generated example output.
-- Fresh clone tracked file count: 125.
+- Fresh clone tracked file count: 126.
 - `CRESTU_GPT6PRO_FIXED` and `NextStep` absent from the fresh clone.
 - Active source/runtime absolute-path scan: no `E:\`, `C:\`, `CRESTU_GPT6PRO_FIXED`, or `NextStep` dependency found.
 
