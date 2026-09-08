@@ -50,7 +50,7 @@ The protected Phase 3b branch was pushed before cleanup:
 ```text
 origin/phase3-2b-response-convergence -> 262892a
 origin/codex/release-20260908        -> 4dc3360
-origin/main                           -> 70fb3b9
+origin/main                           -> 6cf89bf
 ```
 
 The old checkpoint, Phase 3.2, Phase 3.2a branches and tags remain available for historical recovery. They are not required by a fresh clone.
