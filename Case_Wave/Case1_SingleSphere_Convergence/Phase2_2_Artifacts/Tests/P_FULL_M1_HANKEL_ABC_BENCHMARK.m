@@ -153,10 +153,10 @@ fid = fopen(fileName, 'r');
 if fid < 0
     error('P_FULL_M1_HANKEL_ABC:MissingBMF', 'Cannot open BMF: %s', fileName);
 end
-cleanup = onCleanup(@() fclose(fid)); %#ok<NASGU>
+cleanup = onCleanup(@() fclose(fid));
 header = cell(4, 1);
 for q = 1:4
-    header{q} = fgetl(fid); %#ok<AGROW>
+    header{q} = fgetl(fid);
 end
 panelCount = sscanf(header{4}, '%d', 1);
 if isempty(panelCount) || panelCount ~= 484
@@ -361,7 +361,7 @@ fid = fopen(fileName, 'w');
 if fid < 0
     error('P_FULL_M1_HANKEL_ABC:CSV', 'Cannot write CSV: %s', fileName);
 end
-cleanup = onCleanup(@() fclose(fid)); %#ok<NASGU>
+cleanup = onCleanup(@() fclose(fid));
 fprintf(fid, ['section,case,m,ntheta,max_theta_absolute,median_theta_absolute,', ...
     'p95_theta_absolute,max_theta_relative,median_theta_relative,p95_theta_relative,', ...
     'baseline_asymptotic_relative_error,median_baseline_asymptotic_relative_error,', ...
@@ -372,7 +372,7 @@ fprintf(fid, ['section,case,m,ntheta,max_theta_absolute,median_theta_absolute,',
 for q = 1:numel(rows)
     description = strrep(rows(q).description, '"', '""');
     fprintf(fid, ['%s,"%s",%d,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,', ...
-        '%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%d,%d,%d,%d,%d,%.17g,%d,"%s"\n'], ...
+        '%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%d,%d,%d,%d,%.17g,%d,"%s"\n'], ...
         rows(q).section, rows(q).caseName, rows(q).m, rows(q).ntheta, ...
         rows(q).maxThetaAbsolute, rows(q).medianThetaAbsolute, ...
         rows(q).p95ThetaAbsolute, rows(q).maxThetaRelative, ...
