@@ -1,0 +1,47 @@
+{
+  "schema": "CRESTU-2D-1",
+  "name": "semicircle",
+  "problem": "radiation_diffraction",
+  "coordinates": "transverse_yz_z_up",
+  "phase": "exp(+i*omega*t)",
+  "reference_yz_m": [
+    0,
+    0
+  ],
+  "waterline_z_m": 0,
+  "normalization_length_m": 1,
+  "fluid": {
+    "rho_kg_m3": 1025,
+    "g_m_s2": 9.81,
+    "domain": "deep_water",
+    "depth_m": "infinite"
+  },
+  "omega_rad_s": [
+    1.7438749955200343,
+    2.2663856663461566,
+    2.7757442214528645
+  ],
+  "dofs": [
+    "sway",
+    "heave",
+    "roll"
+  ],
+  "geometry": {
+    "nodes_file": "semicircle_nodes.csv",
+    "orientation": "left_waterline_to_right_waterline",
+    "check_self_intersection": true
+  },
+  "incident": {
+    "direction_y": 1,
+    "amplitude_m": 1
+  },
+  "solver": {
+    "method": "constant_source_exact_log",
+    "wave_order": 8,
+    "force_order": 4
+  },
+  "output": {
+    "save": true,
+    "directory": "../../results/2d/semicircle"
+  }
+}

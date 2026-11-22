@@ -1,0 +1,16 @@
+{
+ "frozen_before_first_solve":"2026-10-29",
+ "source_base":"6f05a7a1ebb12ed89e2be52912a9559fb342aa18",
+ "linear_residual_max":1e-10,
+ "analytic_semicircle_heave_relative_max":0.005,
+ "body_finest_successive_heave_relative_max":0.005,
+ "normalized_matrix_reciprocity_max":0.005,
+ "normalized_minimum_eigenvalue_min":-1e-6,
+ "strip_free_surface_potential_scaled_max":1e-10,
+ "strip_bottom_velocity_scaled_max":1e-10,
+ "explicit_boundary_crosscheck_heave_relative_max":0.01,
+ "explicit_boundary_successive_relative_max":0.005,
+ "independent_refined_fv_heave_relative_max":0.01,
+ "original_table_comparison_bands_relative":[0.03,0.05],
+ "note":"Original-table bands are scientific classifications, not permission to alter thresholds. Every FAIL remains recorded."
+}
